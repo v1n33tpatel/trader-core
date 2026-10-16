@@ -147,3 +147,9 @@ trader-core/
    * **Web Security**: Client secrets and OAuth token exchanges must remain strictly on the backend. Never expose cTrader application secrets to frontend JavaScript.
    * **Mock-First Testing**: Pytest tests must never open live sockets to cTrader; always mock transport layers and message handlers.
 
+9. **Market Imbalances, CME Gaps & Liquidity Clusters**:
+   * **CME Gaps as Magnets**: Weekend gaps between Friday 17:00 ET close and Sunday 18:00 ET open act as macro mean-reversion targets and high-probability take-profit zones, not immediate breakout triggers.
+   * **Liquidity Sweeps**: Clusters of stop-losses resting at Equal Highs (EQH) and Equal Lows (EQL) are frequently swept before genuine market reversals occur. Never place breakout market orders directly into un-swept liquidity pools.
+   * **Volume Profile Integration**: Focus entries near the Value Area boundaries (VAH/VAL) or High Volume Nodes (HVN); anticipate rapid price acceleration across Low Volume Nodes (LVN).
+
+
