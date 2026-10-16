@@ -112,3 +112,11 @@ trader-core/
 4. **Testing Requirements**:
    * Whenever adding new strategies, broker functions, or API routes, write corresponding tests under `tests/`.
    * Ensure tests run cleanly with `./.venv/bin/python -m pytest`.
+
+5. **Binance API & Crypto Feed Guidelines**:
+   * **Endpoint & Base URL**: Standard Spot REST base is `https://api.binance.com`. Klines are fetched from `/api/v3/klines`.
+   * **Pair Normalization**: Always normalize crypto symbols to uppercase concatenated format without slashes (e.g. `BTCUSDT`, `ETHUSDT`). Use `f"{symbol.upper()}USDT" if not symbol.endswith("USDT") else symbol.upper()`.
+   * **Kline Schema & Type Parsing**: Kline values from Binance arrive as strings. Always explicitly cast open `k[1]`, high `k[2]`, low `k[3]`, close `k[4]`, and volume `k[5]` to `float`.
+   * **HMAC-SHA256 Signing**: For private endpoints (`/api/v3/account`, `/api/v3/order`), include `X-MBX-APIKEY` header, `recvWindow=5000`, `timestamp` in ms (`int(time.time() * 1000)`), and append the hex digest signature.
+   * **Mock-First Testing**: Pytest tests must never issue live HTTP requests to Binance; always mock via `monkeypatch` with sample kline lists.
+
