@@ -118,5 +118,29 @@ trader-core/
    * **Pair Normalization**: Always normalize crypto symbols to uppercase concatenated format without slashes (e.g. `BTCUSDT`, `ETHUSDT`). Use `f"{symbol.upper()}USDT" if not symbol.endswith("USDT") else symbol.upper()`.
    * **Kline Schema & Type Parsing**: Kline values from Binance arrive as strings. Always explicitly cast open `k[1]`, high `k[2]`, low `k[3]`, close `k[4]`, and volume `k[5]` to `float`.
    * **HMAC-SHA256 Signing**: For private endpoints (`/api/v3/account`, `/api/v3/order`), include `X-MBX-APIKEY` header, `recvWindow=5000`, `timestamp` in ms (`int(time.time() * 1000)`), and append the hex digest signature.
+   * **Web Architecture & Security**: Never expose Binance API keys or private endpoints directly to the browser frontend. All authenticated requests must be proxied through the backend. For live client-side candlestick/ticker updates without backend polling, connect the browser directly to Binance public WebSockets (`wss://stream.binance.com:9443/ws/<symbol>@kline_<interval>`).
    * **Mock-First Testing**: Pytest tests must never issue live HTTP requests to Binance; always mock via `monkeypatch` with sample kline lists.
+
+6. **Kraken API & Broker Guidelines**:
+   * **Endpoint & Base URLs**: REST base is `https://api.kraken.com`. WebSocket v2 base is `wss://ws.kraken.com/v2` (public) and `wss://ws-auth.kraken.com/v2` (private with token).
+   * **Authentication (HMAC-SHA512)**: Private endpoints require `API-Key` and `API-Sign` headers. The signature is computed over `urlpath + sha256(nonce + postdata)` using `base64.b64decode(api_secret)` with SHA512.
+   * **Nonce Invariant**: `nonce` must be a strictly increasing integer (`int(time.time() * 1000)`).
+   * **Asset Normalization**: Strip legacy `X` and `Z` prefixes from assets (e.g. `XXBT` -> `BTC`, `ZUSD` -> `USD`) and ignore staking suffixes (`.S`, `.F`).
+   * **Web Security**: Never expose Kraken credentials to the frontend. For live web charts, connect browsers directly to WebSocket v2 `ohlc` channel.
+   * **Mock-First Testing**: Pytest tests must mock private Kraken balance responses and never hit live endpoints.
+
+7. **Trading 212 API & Broker Guidelines**:
+   * **Endpoint & Base URLs**: Demo is `https://demo.trading212.com/api/v0`; Live is `https://live.trading212.com/api/v0`.
+   * **Authentication**: Use HTTP Basic Auth with base64-encoded `API_KEY:API_SECRET` in the `Authorization` header.
+   * **Order Sign Invariant**: Buy orders require positive quantity (`quantity > 0`); sell orders **must** use negative quantity (`quantity < 0`, e.g. `-10.0`).
+   * **Non-Idempotent Market Orders**: Market orders cannot be safely retried upon timeout; check `/equity/orders` or order history before re-submitting.
+   * **Ticker Normalization**: Strip exchange suffixes (`_US_EQ`, `_EQ`, `l_EQ`, `.L`) for clean UI display, but retain the raw ticker for API order requests.
+   * **Rate Limits & Fail-Safe**: Per-account rate limits return HTTP 429. Adapters must fail safely, returning `(0.0, [])` upon error.
+   * **Mock-First Testing**: Pytest tests must never issue live HTTP calls to Trading 212; always mock via `monkeypatch`.
+
+8. **cTrader Open API & Broker Guidelines**:
+   * **Endpoints & Ports**: Live host is `live.ctraderapi.com`; Demo host is `demo.ctraderapi.com`. Port `5035` is Protocol Buffers (TCP/WSS); Port `5036` is JSON.
+   * **Two-Tier Authentication**: First exchange OAuth 2.0 authorization code for `accessToken` via `https://connect.spotware.com/apps/token`. Over the socket, send `ProtoOAApplicationAuthReq` (with `clientId`/`clientSecret`), then `ProtoOAAccountAuthReq` (with `ctidTraderAccountId`/`accessToken`).
+   * **Web Security**: Client secrets and OAuth token exchanges must remain strictly on the backend. Never expose cTrader application secrets to frontend JavaScript.
+   * **Mock-First Testing**: Pytest tests must never open live sockets to cTrader; always mock transport layers and message handlers.
 

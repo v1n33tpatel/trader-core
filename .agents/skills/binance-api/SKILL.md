@@ -115,3 +115,42 @@ def test_binance_feed(monkeypatch):
 
     monkeypatch.setattr("requests.get", lambda url, **kwargs: MockResponse())
 ```
+
+---
+
+## 5. Web Terminal & Browser Integration
+
+### Architectural Rules:
+* **Private Endpoints (Authenticated)**: Must ALWAYS route through the Flask backend (`/api/broker/binance/*`). Never expose `BINANCE_API_KEY` or `BINANCE_API_SECRET` in client-side browser code.
+* **Public Historical Data**: Proxy through `/api/market/data?provider=binance` to prevent browser CORS and centralize caching.
+* **Real-Time Live Streaming**: Connect the browser frontend directly to the Binance Public WebSocket stream to avoid backend polling overhead.
+
+### Browser WebSocket Streaming (`dashboard.js`):
+```javascript
+// Connect directly from the web client for live candle updates
+function subscribeBinanceLiveCandles(symbol, interval, onUpdate) {
+  const streamSymbol = symbol.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const wsUrl = `wss://stream.binance.com:9443/ws/${streamSymbol}@kline_${interval}`;
+  const socket = new WebSocket(wsUrl);
+
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.e === "kline") {
+      const k = data.k;
+      onUpdate({
+        time: Math.floor(k.t / 1000),
+        open: parseFloat(k.o),
+        high: parseFloat(k.h),
+        low: parseFloat(k.l),
+        close: parseFloat(k.c),
+        volume: parseFloat(k.v),
+        isClosed: k.x, // true when candle finalized
+      });
+    }
+  };
+
+  socket.onerror = (err) => console.warn("Binance WebSocket stream error:", err);
+  return socket;
+}
+```
+
