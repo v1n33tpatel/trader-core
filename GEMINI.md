@@ -152,4 +152,14 @@ trader-core/
    * **Liquidity Sweeps**: Clusters of stop-losses resting at Equal Highs (EQH) and Equal Lows (EQL) are frequently swept before genuine market reversals occur. Never place breakout market orders directly into un-swept liquidity pools.
    * **Volume Profile Integration**: Focus entries near the Value Area boundaries (VAH/VAL) or High Volume Nodes (HVN); anticipate rapid price acceleration across Low Volume Nodes (LVN).
 
+10. **Multi-API Rate Limiting, 429 Backoff & Concurrency Invariants**:
+    * **Binance Weight Limits & 418 Avoidance**: Spot REST has a 1200 request weight/min IP limit (monitored via `x-mbx-used-weight-1m`). Never burst calls without weight tracking. On HTTP 429, halt immediately and sleep for the duration indicated in `Retry-After`. Continued requests after 429 trigger HTTP 418 (IP ban) lasting from 2 minutes up to 3 days.
+    * **Kraken Leaky Bucket Counter**: Private endpoints cost 1–2 points against a decaying call counter (Starter: 15 max, 0.33/s decay; Intermediate/Pro: 20 max, 0.5–1.0/s decay). On `EAPI:Rate limit exceeded`, immediately back off by at least 5 seconds.
+    * **Trading 212 Pacing & Cache**: Enforce max 1 request/sec for orders and 30 requests/min for general endpoints. Cache balance/cash queries with short TTL (10–30s) instead of polling on every tick.
+    * **eToro Adapter Throttling**: Enforce minimum 1.2s interval between requests via `RateThrottler` to avoid account-level throttling.
+    * **Yahoo Finance & Free Feeds**: Limit to max 1–2 req/sec with cached snapshot payloads; rapid polling leads to HTTP 429 or crumb invalidation.
+    * **Local Ollama Concurrency**: Local LLM inference must be serialized (concurrency lock / semaphore = 1) with 45–90s timeouts to prevent GPU VRAM exhaustion or queue lockup.
+    * **Exponential Backoff with Jitter**: All retry loops on transient HTTP 429/502/503 errors must use exponential backoff with randomized jitter: $t_{\text{wait}} = \min(t_{\max}, 2^{\text{attempt}} + \text{uniform}(0, 1))$.
+
+
 
