@@ -173,6 +173,19 @@ def analyze_market_route():
     except Exception:
         pa_structure = {}
 
+    liquidity_telemetry = {}
+    try:
+        from quant_trading.liquidity import calculate_volume_profile, estimate_liquidation_clusters
+        last_close = float(snapshot.bars[-1]["close"]) if snapshot.bars else 0.0
+        vp = calculate_volume_profile(snapshot.bars)
+        liq = estimate_liquidation_clusters(last_close)
+        liquidity_telemetry = {
+            "volume_profile": vp,
+            "liquidation_clusters": liq,
+        }
+    except Exception:
+        liquidity_telemetry = {}
+
     context = {
         "provider": snapshot.provider,
         "symbol": snapshot.symbol,
@@ -180,13 +193,14 @@ def analyze_market_route():
         "quote": snapshot.quote,
         "history": market_summary,
         "price_action_structure": pa_structure,
+        "liquidity_profile": liquidity_telemetry,
         "recent_ohlcv": snapshot.bars[-40:],
         "active_strategy": "volatility-scaled time-series momentum & institutional price action",
         "strategy_settings": settings,
     }
     prompt = (
-        "You are a quantitative research assistant. Analyze the supplied market context, settings, and "
-        "institutional price action structure (swing pivots, liquidity sweeps, rejection wicks, and break of structure). "
+        "You are a quantitative research assistant. Analyze the supplied market context, settings, "
+        "Volume Profile (POC, VAH, VAL, LVN), and institutional price action structure (swing pivots, liquidity sweeps, rejection wicks). "
         "Separate observed data from hypotheses, state that prices may be delayed, discuss risks, and never "
         "claim certainty or issue an order. If asked to optimize, suggest parameter candidates and say they "
         "must be backtested out of sample; do not claim to have optimized unless results are supplied. "
@@ -216,6 +230,7 @@ def analyze_market_route():
         "summary": market_summary,
         "settings": settings,
         "price_action": pa_structure,
+        "liquidity": liquidity_telemetry,
     })
 
 

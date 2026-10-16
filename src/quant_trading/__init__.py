@@ -1,6 +1,16 @@
 from quant_trading.backtest import BacktestConfig, BacktestEngine, BacktestResult
-from quant_trading.metrics import PerformanceMetrics, calculate_metrics
+from quant_trading.metrics import (
+    PerformanceMetrics,
+    calculate_metrics,
+    calculate_half_life,
+    kelly_position_fraction,
+)
 from quant_trading.strategy import Strategy, TimeSeriesMomentum
+from quant_trading.liquidity import (
+    detect_cme_gaps,
+    calculate_volume_profile,
+    estimate_liquidation_clusters,
+)
 
 __all__ = [
     "BacktestConfig",
@@ -10,4 +20,10 @@ __all__ = [
     "Strategy",
     "TimeSeriesMomentum",
     "calculate_metrics",
+    "calculate_half_life",
+    "kelly_position_fraction",
+    "detect_cme_gaps",
+    "calculate_volume_profile",
+    "estimate_liquidation_clusters",
 ]
+

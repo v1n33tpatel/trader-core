@@ -22,6 +22,8 @@ def test_demo_prices_are_deterministic_and_backtestable() -> None:
         "annualized_volatility",
         "sharpe_ratio",
         "max_drawdown",
+        "sortino_ratio",
+        "calmar_ratio",
     }
 
 

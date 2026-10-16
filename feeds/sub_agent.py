@@ -90,6 +90,40 @@ class TwoTierQuantAgent:
             return {"error": str(e)}
 
     @staticmethod
+    def get_liquidity_clusters(symbol: str) -> Dict[str, Any]:
+        """Fetch candles and calculate Volume Profile (POC/VAH/VAL) and liquidation clusters."""
+        pair = f"{symbol.upper()}USDT" if not symbol.endswith("USDT") else symbol.upper()
+        try:
+            r = requests.get(f"https://api.binance.com/api/v3/klines?symbol={pair}&interval=1h&limit=100", timeout=5)
+            if r.status_code != 200:
+                return {"error": f"Failed Binance API response: {r.status_code}"}
+            from datetime import datetime, timezone
+            from quant_trading.liquidity import calculate_volume_profile, estimate_liquidation_clusters, detect_cme_gaps
+            candles = [
+                {
+                    "timestamp": datetime.fromtimestamp(k[0] / 1000.0, tz=timezone.utc).isoformat(),
+                    "high": float(k[2]),
+                    "low": float(k[3]),
+                    "close": float(k[4]),
+                    "volume": float(k[5]),
+                }
+                for k in r.json()
+            ]
+            current_price = candles[-1]["close"]
+            vp = calculate_volume_profile(candles, num_bins=40)
+            liq = estimate_liquidation_clusters(current_price)
+            cme = detect_cme_gaps(candles)
+            return {
+                "symbol": symbol.upper(),
+                "current_price": current_price,
+                "volume_profile": vp,
+                "liquidation_clusters": liq,
+                "cme_gaps": cme,
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    @staticmethod
     def get_broker_risk_envelope() -> Dict[str, Any]:
         """Fetch internal risk parameters and portfolio balance limits."""
         return {
@@ -121,6 +155,20 @@ class TwoTierQuantAgent:
                 "function": {
                     "name": "get_price_action_metrics",
                     "description": "Fetch institutional market structure, swing pivots, liquidity sweeps, pinbar rejections, and BOS.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "symbol": {"type": "string", "description": "Ticker symbol, e.g. ETH, BTC, SOL"}
+                        },
+                        "required": ["symbol"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_liquidity_clusters",
+                    "description": "Fetch Volume Profile (POC, VAH, VAL, LVN) and estimated liquidation clusters for a symbol.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -165,6 +213,9 @@ class TwoTierQuantAgent:
                 elif fn_name == "get_price_action_metrics":
                     sym = args.get("symbol", "ETH")
                     tool_results["price_action"] = self.get_price_action_metrics(sym)
+                elif fn_name == "get_liquidity_clusters":
+                    sym = args.get("symbol", "ETH")
+                    tool_results["liquidity_clusters"] = self.get_liquidity_clusters(sym)
                 elif fn_name == "get_broker_risk_envelope":
                     tool_results["risk_rules"] = self.get_broker_risk_envelope()
 
@@ -178,6 +229,8 @@ class TwoTierQuantAgent:
             tool_results["market_data"] = self.get_binance_metrics(target_sym)
         if "price_action" not in tool_results:
             tool_results["price_action"] = self.get_price_action_metrics(target_sym)
+        if "liquidity_clusters" not in tool_results:
+            tool_results["liquidity_clusters"] = self.get_liquidity_clusters(target_sym)
         if "risk_rules" not in tool_results:
             tool_results["risk_rules"] = self.get_broker_risk_envelope()
 
@@ -199,8 +252,10 @@ RULES:
 2. SELL/EXIT on overbought RSI (>70), bearish sweep (shooting star rejection), or bearish break of structure.
 3. If Price Action pattern is present (e.g. BULLISH_LIQUIDITY_SWEEP_PINBAR), prioritize the structural invalidation level as the suggested_sl.
 4. Ensure minimum 1:2 Risk/Reward ratio for suggested_tp vs suggested_sl.
-5. Respect allocation limits ($50 max).
-6. Return STRICT RAW JSON ONLY matching this schema:
+5. Use Volume Profile: Target entries near Value Area boundaries (VAH/VAL) or High Volume Nodes; use Low Volume Nodes (LVN) or opposite Value Area limits for take_profit.
+6. Invalidate trade if price breaches primary liquidation cluster or sweep wick level.
+7. Respect allocation limits ($50 max).
+8. Return STRICT RAW JSON ONLY matching this schema:
 {{
   "action": "BUY" | "SELL" | "HOLD",
   "confidence": <float 0.0 to 1.0>,
