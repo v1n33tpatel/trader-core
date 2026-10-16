@@ -102,7 +102,10 @@ trader-core/
 
 2. **Quant & Backtest Mechanics**:
    * Strategy signals must strictly assume execution delay: close-price signals fill at the next close to avoid lookahead bias.
-   * Turnover costs (`one_way_cost_bps`) must be deducted on position entries, adjustments, and terminal portfolio liquidation.
+   * Turnover costs (`one_way_cost_bps`) must be deducted on position entries, adjustments, and terminal portfolio liquidation: $\text{Cost}_t = |w_t - w_{t-1}| \times \text{bps} \times 10^{-4}$.
+   * Metric annualization factors: daily equities use $\sqrt{252}$; 24/7 daily crypto uses $\sqrt{365}$; hourly crypto uses $\sqrt{365 \times 24} \approx 93.6$.
+   * Evaluate strategies using both Sharpe ($\frac{\mu - r_f}{\sigma}$) and Sortino ($\frac{\mu - r_f}{\sigma_{down}}$) to account for downside return asymmetry.
+   * Volatility-targeted weights must cap maximum leverage: $w_t = \text{clip}\left(\frac{\sigma_{\text{target}}}{\hat{\sigma}_t} \cdot \text{signal}_t, -L_{\max}, L_{\max}\right)$.
    * All timestamps must be UTC timezone-aware (`datetime.now(timezone.utc)` or `pd.to_datetime(..., utc=True)`). Avoid deprecated `datetime.utcnow()`.
 
 3. **Broker Adapters**:
