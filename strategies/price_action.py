@@ -60,6 +60,43 @@ class PriceActionStrategy(BaseStrategy, BaseEventStrategy):
 
         return swing_highs, swing_lows
 
+    def detect_fair_value_gaps(self, bars: List[Any], lookback: int = 15) -> List[Dict[str, Any]]:
+        """Identify unfilled 3-candle Fair Value Gaps (imbalances) within recent bars."""
+        fvgs = []
+        n = len(bars)
+        start = max(2, n - lookback)
+        for i in range(start, n):
+            c_prev = bars[i - 2]
+            c_curr = bars[i]
+            h_prev = self._bar_val(c_prev, "high")
+            l_prev = self._bar_val(c_prev, "low")
+            h_curr = self._bar_val(c_curr, "high")
+            l_curr = self._bar_val(c_curr, "low")
+
+            # Bullish FVG: current candle low is strictly higher than 2 bars ago high
+            if l_curr > h_prev:
+                gap = l_curr - h_prev
+                if gap > 0:
+                    fvgs.append({
+                        "index": i,
+                        "type": "bullish",
+                        "top": l_curr,
+                        "bottom": h_prev,
+                        "gap_size": round(gap, 4),
+                    })
+            # Bearish FVG: current candle high is strictly lower than 2 bars ago low
+            elif h_curr < l_prev:
+                gap = l_prev - h_curr
+                if gap > 0:
+                    fvgs.append({
+                        "index": i,
+                        "type": "bearish",
+                        "top": l_prev,
+                        "bottom": h_curr,
+                        "gap_size": round(gap, 4),
+                    })
+        return fvgs
+
     def analyze_market_structure(self, bars: List[Any]) -> Dict[str, Any]:
         """Extract comprehensive Price Action telemetry for AI reasoning and execution."""
         if len(bars) < 5:
@@ -72,6 +109,8 @@ class PriceActionStrategy(BaseStrategy, BaseEventStrategy):
                 "bias": "NEUTRAL",
                 "sweep_detected": False,
                 "bos_detected": False,
+                "choch_detected": False,
+                "fvg_detected": False,
             }
 
         swing_highs, swing_lows = self.detect_swing_pivots(bars)
@@ -90,6 +129,14 @@ class PriceActionStrategy(BaseStrategy, BaseEventStrategy):
         last_swing_high = swing_highs[-1]["price"] if swing_highs else None
         last_swing_low = swing_lows[-1]["price"] if swing_lows else None
 
+        # Determine overall structural trend
+        trend = "RANGING"
+        if len(swing_highs) >= 2 and len(swing_lows) >= 2:
+            if swing_highs[-1]["price"] > swing_highs[-2]["price"] and swing_lows[-1]["price"] > swing_lows[-2]["price"]:
+                trend = "UPTREND"
+            elif swing_highs[-1]["price"] < swing_highs[-2]["price"] and swing_lows[-1]["price"] < swing_lows[-2]["price"]:
+                trend = "DOWNTREND"
+
         min_wick = self.params.get("min_wick_ratio", 0.50)
         pattern = None
         bias = "NEUTRAL"
@@ -103,6 +150,10 @@ class PriceActionStrategy(BaseStrategy, BaseEventStrategy):
         bos_detected = False
         bos_type = None
         bos_level = None
+        choch_detected = False
+        choch_type = None
+        fvg_detected = False
+        fvg_type = None
 
         # 1. Check Bullish Liquidity Sweep & Pinbar Rejection
         if last_swing_low is not None and c_low < last_swing_low and c_close > last_swing_low:
@@ -130,7 +181,28 @@ class PriceActionStrategy(BaseStrategy, BaseEventStrategy):
                 sl = round(c_high * 1.002, 4)
                 risk = max(sl - c_close, c_close * 0.005)
                 tp = round(c_close - (risk * self.params.get("risk_reward_ratio", 2.0)), 4)
-        # 3. Check Bullish Break of Structure (BOS)
+        # 3. Check Change of Character (ChoCH) - Trend Invalidation / Reversal Breakout
+        elif trend == "DOWNTREND" and last_swing_high is not None and c_close > last_swing_high:
+            pattern = "BULLISH_CHANGE_OF_CHARACTER"
+            bias = "BULLISH"
+            signal_type = "BUY"
+            confidence = 0.85
+            choch_detected = True
+            choch_type = "bullish"
+            sl = round(c_low * 0.998, 4)
+            risk = max(c_close - sl, c_close * 0.005)
+            tp = round(c_close + (risk * self.params.get("risk_reward_ratio", 2.0)), 4)
+        elif trend == "UPTREND" and last_swing_low is not None and c_close < last_swing_low:
+            pattern = "BEARISH_CHANGE_OF_CHARACTER"
+            bias = "BEARISH"
+            signal_type = "SELL"
+            confidence = 0.85
+            choch_detected = True
+            choch_type = "bearish"
+            sl = round(c_high * 1.002, 4)
+            risk = max(sl - c_close, c_close * 0.005)
+            tp = round(c_close - (risk * self.params.get("risk_reward_ratio", 2.0)), 4)
+        # 4. Check Trend Continuation Break of Structure (BOS)
         elif last_swing_high is not None and c_close > last_swing_high:
             prev = bars[-2]
             if self._bar_val(prev, "close") <= last_swing_high:
@@ -144,7 +216,6 @@ class PriceActionStrategy(BaseStrategy, BaseEventStrategy):
                 sl = round(last_swing_high * (1.0 - (self.params.get("min_sl_pct", 1.0) / 100.0)), 4)
                 risk = max(c_close - sl, c_close * 0.005)
                 tp = round(c_close + (risk * self.params.get("risk_reward_ratio", 2.0)), 4)
-        # 4. Check Bearish Break of Structure (BOS)
         elif last_swing_low is not None and c_close < last_swing_low:
             prev = bars[-2]
             if self._bar_val(prev, "close") >= last_swing_low:
@@ -158,21 +229,32 @@ class PriceActionStrategy(BaseStrategy, BaseEventStrategy):
                 sl = round(last_swing_low * (1.0 + (self.params.get("min_sl_pct", 1.0) / 100.0)), 4)
                 risk = max(sl - c_close, c_close * 0.005)
                 tp = round(c_close - (risk * self.params.get("risk_reward_ratio", 2.0)), 4)
-        # 5. General Rejection Hammer/Shooting Star (Independent of prior swing level)
-        elif lower_wick_ratio >= 0.60:
-            pattern = "BULLISH_REJECTION_HAMMER"
-            bias = "BULLISH_LEAN"
-        elif upper_wick_ratio >= 0.60:
-            pattern = "BEARISH_REJECTION_SHOOTING_STAR"
-            bias = "BEARISH_LEAN"
-
-        # Determine overall trend structure
-        trend = "RANGING"
-        if len(swing_highs) >= 2 and len(swing_lows) >= 2:
-            if swing_highs[-1]["price"] > swing_highs[-2]["price"] and swing_lows[-1]["price"] > swing_lows[-2]["price"]:
-                trend = "UPTREND_HIGHER_HIGHS_HIGHER_LOWS"
-            elif swing_highs[-1]["price"] < swing_highs[-2]["price"] and swing_lows[-1]["price"] < swing_lows[-2]["price"]:
-                trend = "DOWNTREND_LOWER_HIGHS_LOWER_LOWS"
+        else:
+            # 5. Check Fair Value Gap Retest (Imbalance Mitigation)
+            active_fvgs = self.detect_fair_value_gaps(bars[:-1], lookback=10)
+            for fvg in reversed(active_fvgs):
+                if fvg["type"] == "bullish" and c_low <= fvg["top"] and c_low >= fvg["bottom"] and lower_wick_ratio >= 0.40:
+                    pattern = "BULLISH_FVG_MITIGATION_RETEST"
+                    bias = "BULLISH"
+                    signal_type = "BUY"
+                    confidence = 0.84
+                    fvg_detected = True
+                    fvg_type = "bullish_mitigation"
+                    sl = round(fvg["bottom"] * 0.998, 4)
+                    risk = max(c_close - sl, c_close * 0.005)
+                    tp = round(c_close + (risk * self.params.get("risk_reward_ratio", 2.0)), 4)
+                    break
+                elif fvg["type"] == "bearish" and c_high >= fvg["bottom"] and c_high <= fvg["top"] and upper_wick_ratio >= 0.40:
+                    pattern = "BEARISH_FVG_MITIGATION_RETEST"
+                    bias = "BEARISH"
+                    signal_type = "SELL"
+                    confidence = 0.84
+                    fvg_detected = True
+                    fvg_type = "bearish_mitigation"
+                    sl = round(fvg["top"] * 1.002, 4)
+                    risk = max(sl - c_close, c_close * 0.005)
+                    tp = round(c_close - (risk * self.params.get("risk_reward_ratio", 2.0)), 4)
+                    break
 
         return {
             "structure": trend,
@@ -198,6 +280,10 @@ class PriceActionStrategy(BaseStrategy, BaseEventStrategy):
             "bos_detected": bos_detected,
             "bos_type": bos_type,
             "bos_level": bos_level,
+            "choch_detected": choch_detected,
+            "choch_type": choch_type,
+            "fvg_detected": fvg_detected,
+            "fvg_type": fvg_type,
         }
 
     def evaluate(self, symbol: str, bars: List[Bar], current_positions: List[Dict[str, Any]], macro_context: Optional[Dict[str, Any]] = None) -> StrategySignal:

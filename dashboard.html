@@ -194,8 +194,21 @@
             <div><span class="metric-label">DATA AS OF</span><strong id="market-as-of">—</strong></div>
             <span class="market-source" id="market-source">—</span>
           </div>
+          <div class="liquidity-bar" id="liquidity-bar" hidden>
+            <div class="liquidity-item"><span class="metric-label">POINT OF CONTROL (POC)</span><strong id="liq-poc" class="color-gold">—</strong></div>
+            <div class="liquidity-item"><span class="metric-label">VALUE AREA HIGH (VAH)</span><strong id="liq-vah" class="color-cyan">—</strong></div>
+            <div class="liquidity-item"><span class="metric-label">VALUE AREA LOW (VAL)</span><strong id="liq-val" class="color-cyan">—</strong></div>
+            <div class="liquidity-item"><span class="metric-label">KEY LIQ POOL</span><strong id="liq-cluster">—</strong></div>
+            <div class="liquidity-item"><span class="metric-label">CME GAP</span><strong id="liq-cme">—</strong></div>
+          </div>
           <div class="market-chart-frame" id="market-chart-frame" hidden>
-            <div class="chart-heading"><span>HISTORICAL CLOSE</span><span id="market-chart-count">—</span></div>
+            <div class="chart-heading">
+              <span>HISTORICAL CLOSE &amp; VOLUME PROFILE</span>
+              <div class="chart-heading-actions">
+                <span id="live-ws-badge" class="ws-live-badge" hidden><span class="ws-dot"></span>LIVE WS</span>
+                <span id="market-chart-count">—</span>
+              </div>
+            </div>
             <canvas id="market-chart" aria-label="Historical market prices" role="img"></canvas>
           </div>
           <div class="market-status" id="market-status" aria-live="polite">Load a symbol to fetch current quote and historical OHLCV bars.</div>
@@ -249,6 +262,8 @@
               <div class="result-metric"><span>NET RETURN</span><strong id="metric-total-return">—</strong></div>
               <div class="result-metric"><span>ANNUALIZED</span><strong id="metric-annualized-return">—</strong></div>
               <div class="result-metric"><span>SHARPE</span><strong id="metric-sharpe">—</strong></div>
+              <div class="result-metric"><span>SORTINO</span><strong id="metric-sortino">—</strong></div>
+              <div class="result-metric"><span>CALMAR</span><strong id="metric-calmar">—</strong></div>
               <div class="result-metric"><span>MAX DRAWDOWN</span><strong id="metric-max-drawdown">—</strong></div>
               <div class="result-metric"><span>ANN. VOLATILITY</span><strong id="metric-volatility">—</strong></div>
             </div>
@@ -256,6 +271,62 @@
             <div class="chart-frame"><canvas id="equity-chart" aria-label="Backtest net equity curve" role="img"></canvas></div>
             <p class="chart-disclaimer">Illustrative backtest only. Net of configured turnover costs; historical results do not predict future performance.</p>
           </div>
+        </section>
+
+        <section class="panel sizing-panel" aria-labelledby="sizing-title">
+          <div class="section-heading compact-heading">
+            <div>
+              <div class="eyebrow">CAPITAL ALLOCATION <span>·</span> KELLY CRITERION &amp; RISK SENTINEL</div>
+              <h2 id="sizing-title">Position Sizing <span class="heading-amp">&amp;</span> Risk Guardrail</h2>
+            </div>
+            <span class="engine-badge"><span class="status-dot"></span>QUANT FORMULAS</span>
+          </div>
+          <div class="sizing-grid">
+            <div class="sizing-controls">
+              <label class="field-control">
+                <span>WIN RATE (%)</span>
+                <input id="calc-win-rate" type="number" min="1" max="99" step="1" value="55" />
+              </label>
+              <label class="field-control">
+                <span>WIN / LOSS RATIO</span>
+                <input id="calc-win-loss" type="number" min="0.1" max="20" step="0.1" value="1.8" />
+              </label>
+              <label class="field-control">
+                <span>PORTFOLIO EQUITY ($)</span>
+                <div class="input-with-button">
+                  <input id="calc-equity" type="number" min="1" step="10" value="1000" />
+                  <button type="button" class="button-small" id="calc-sync-equity" title="Sync from selected broker equity">Sync Broker</button>
+                </div>
+              </label>
+              <label class="field-control">
+                <span>MAX RISK PER TRADE (%)</span>
+                <input id="calc-risk-pct" type="number" min="0.1" max="10" step="0.1" value="2.0" />
+              </label>
+            </div>
+            <div class="sizing-outputs">
+              <div class="output-card output-recommended">
+                <span class="output-label">RECOMMENDED (HALF-KELLY)</span>
+                <strong id="out-half-kelly">12.5%</strong>
+                <span class="output-sub" id="out-half-kelly-usd">$125.00</span>
+              </div>
+              <div class="output-card">
+                <span class="output-label">FULL KELLY FRACTION</span>
+                <strong id="out-full-kelly">25.0%</strong>
+                <span class="output-sub" id="out-full-kelly-usd">$250.00</span>
+              </div>
+              <div class="output-card">
+                <span class="output-label">RISK-GUARDRAIL MAX LOSS (2%)</span>
+                <strong id="out-risk-loss">$20.00</strong>
+                <span class="output-sub">CIRCUIT BREAKER CAP</span>
+              </div>
+              <div class="output-card">
+                <span class="output-label">EXPECTANCY PER TRADE</span>
+                <strong id="out-expectancy">+0.54 R</strong>
+                <span class="output-sub" id="out-edge-status">POSITIVE EDGE</span>
+              </div>
+            </div>
+          </div>
+          <div class="panel-footnote">Half-Kelly reduces volatility drag and protects against parameter uncertainty. Real-time sizing conforms to RiskSentinel guardrail policies.</div>
         </section>
 
         <section class="panel search-panel" aria-labelledby="search-title">
@@ -294,6 +365,7 @@
               <div class="prompt-list" aria-label="Example research prompts">
                 <button class="prompt-button" type="button" data-prompt="Analyze the current trend, volatility, and key risks">Analyze market</button>
                 <button class="prompt-button" type="button" data-prompt="Analyze Price Action: identify swing pivots, liquidity sweeps, pinbar rejections, and break of structure">Price Action &amp; Structure</button>
+                <button class="prompt-button" type="button" data-prompt="Analyze Volume Profile (POC/VAH/VAL), CME gaps, and retail liquidation clusters">Liquidity &amp; Volume Profile</button>
                 <button class="prompt-button" type="button" data-prompt="Optimize settings using a chronological train and validation split">Optimize settings</button>
               </div>
               <button class="button button-analyze" type="submit"><span aria-hidden="true">✳</span> Analyze</button>

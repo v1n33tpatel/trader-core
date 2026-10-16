@@ -40,9 +40,10 @@ Provide your response structured as:
 
     def analyze_price_action(self, symbol: str, price_action_data: dict, current_price: float = None):
         prompt = f"""
-You are an expert institutional Price Action quantitative strategist.
-Analyze the following market structure telemetry for {symbol} and produce a professional trading assessment:
+You are an expert institutional Price Action quantitative strategist operating under a strict NON-PREDICTIVE mandate.
+Do NOT attempt to forecast or predict future market direction. Classify and react ONLY to confirmed structural events that have already printed.
 
+Market Structure Telemetry for {symbol}:
 - Symbol: {symbol}
 - Current Price: ${current_price:.4f if current_price else 'N/A'}
 - Market Structure Trend: {price_action_data.get('structure', 'N/A')}
@@ -56,9 +57,9 @@ Analyze the following market structure telemetry for {symbol} and produce a prof
 - Suggested Target (TP): {price_action_data.get('suggested_tp', 'N/A')}
 
 Provide your response structured as:
-1. Market Structure Analysis (Pivots & BOS)
-2. Liquidity & Order Flow Assessment (Sweeps & Wick Rejection)
-3. Trade Recommendation (BUY, SELL, or HOLD with clear Invalidation/Target rationale)
+1. Market Structure Classification (Pivots, BOS, ChoCH)
+2. Liquidity & Order Flow Assessment (Sweeps & Wick Rejections)
+3. Trade Recommendation (BUY, SELL, or mandatory HOLD if no confirmed structural pattern is present; state exact Invalidation and R:R Target)
 """
         payload = {
             "model": self.model,

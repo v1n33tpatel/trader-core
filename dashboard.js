@@ -363,7 +363,10 @@ agentForm.addEventListener("submit", async (event) => {
         const pa = data.price_action;
         const sh = pa.swing_high ? `$${Number(pa.swing_high).toFixed(2)}` : "—";
         const sl = pa.swing_low ? `$${Number(pa.swing_low).toFixed(2)}` : "—";
-        text = `[STRUCTURE: ${String(pa.trend).toUpperCase()} | SH: ${sh} | SL: ${sl} | SWEEP: ${pa.sweep_detected ? pa.sweep_type : "NONE"}]\n\n` + text;
+        const setup = pa.recent_pattern || (pa.sweep_detected ? `${pa.sweep_type} SWEEP` : "CONSOLIDATION");
+        const inv = pa.suggested_sl ? `$${Number(pa.suggested_sl).toFixed(2)}` : "N/A";
+        const tp = pa.suggested_tp ? `$${Number(pa.suggested_tp).toFixed(2)}` : "N/A";
+        text = `[PRICE ACTION | TREND: ${String(pa.trend).toUpperCase()} | SETUP: ${setup} | INVALIDATION (SL): ${inv} | TARGET (TP): ${tp}]\n\n` + text;
       }
       agentResponseText.textContent = text;
     }
@@ -488,6 +491,79 @@ marketForm.addEventListener("submit", async (event) => {
   }
 });
 
+let binanceWebSocket = null;
+
+function disconnectBinanceWebSocket() {
+  if (binanceWebSocket) {
+    try {
+      binanceWebSocket.onclose = null;
+      binanceWebSocket.onerror = null;
+      binanceWebSocket.close();
+    } catch (_) {}
+    binanceWebSocket = null;
+  }
+  const badge = document.querySelector("#live-ws-badge");
+  if (badge) badge.hidden = true;
+}
+
+function connectBinanceWebSocket(symbol, interval) {
+  disconnectBinanceWebSocket();
+  const badge = document.querySelector("#live-ws-badge");
+  if (!badge) return;
+
+  const rawSym = symbol.toUpperCase();
+  const pair = rawSym.endsWith("USDT") ? rawSym.toLowerCase() : `${rawSym.toLowerCase()}usdt`;
+  const klineInterval = interval || "1h";
+  const wsUrl = `wss://stream.binance.com:9443/ws/${pair}@kline_${klineInterval}`;
+
+  try {
+    binanceWebSocket = new WebSocket(wsUrl);
+    binanceWebSocket.onopen = () => {
+      badge.hidden = false;
+      badge.title = `Live WebSocket stream active: ${pair}@kline_${klineInterval}`;
+    };
+    binanceWebSocket.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg && msg.k) {
+          const k = msg.k;
+          const currentPrice = Number(k.c);
+          const quoteEl = document.querySelector("#market-quote");
+          if (quoteEl && Number.isFinite(currentPrice)) {
+            const oldPrice = parseFloat(quoteEl.textContent.replace(/[^0-9.]/g, ""));
+            quoteEl.textContent = `${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDT`;
+            if (oldPrice && currentPrice > oldPrice) {
+              quoteEl.classList.remove("price-down");
+              quoteEl.classList.add("price-up");
+            } else if (oldPrice && currentPrice < oldPrice) {
+              quoteEl.classList.remove("price-up");
+              quoteEl.classList.add("price-down");
+            }
+          }
+          if (loadedMarketData && loadedMarketData.bars && loadedMarketData.bars.length) {
+            const lastBar = loadedMarketData.bars[loadedMarketData.bars.length - 1];
+            lastBar.close = currentPrice;
+            lastBar.high = Math.max(lastBar.high, Number(k.h));
+            lastBar.low = Math.min(lastBar.low, Number(k.l));
+            drawMarketChart(loadedMarketData.bars, loadedMarketData.liquidity);
+          }
+        }
+      } catch (e) {
+        console.error("Binance WS stream message error", e);
+      }
+    };
+    binanceWebSocket.onerror = () => {
+      badge.hidden = true;
+    };
+    binanceWebSocket.onclose = () => {
+      badge.hidden = true;
+    };
+  } catch (e) {
+    console.error("Binance WS stream connection error", e);
+    badge.hidden = true;
+  }
+}
+
 function renderMarketData(data) {
   const currency = data.quote.currency ? ` ${data.quote.currency}` : "";
   document.querySelector("#market-quote").textContent = `${Number(data.quote.price).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:6})}${currency}`;
@@ -497,10 +573,37 @@ function renderMarketData(data) {
   document.querySelector("#market-chart-count").textContent = `${data.bars.length.toLocaleString()} BARS`;
   marketSummary.hidden = false;
   marketChartFrame.hidden = false;
-  drawMarketChart(data.bars);
+
+  // Render Liquidity bar if available
+  const liqBar = document.querySelector("#liquidity-bar");
+  if (data.liquidity && data.liquidity.volume_profile && data.liquidity.volume_profile.poc) {
+    const vp = data.liquidity.volume_profile;
+    document.querySelector("#liq-poc").textContent = `$${Number(vp.poc).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    document.querySelector("#liq-vah").textContent = `$${Number(vp.vah).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    document.querySelector("#liq-val").textContent = `$${Number(vp.val).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    const liqs = data.liquidity.liquidation_clusters?.short_liquidations || [];
+    const firstLiq = liqs.length ? liqs[0] : null;
+    document.querySelector("#liq-cluster").textContent = firstLiq ? `${firstLiq.leverage} @ $${Number(firstLiq.price).toFixed(1)}` : "None in range";
+
+    const cmeGaps = data.liquidity.cme_gaps || [];
+    const openGaps = cmeGaps.filter((g) => !g.filled);
+    document.querySelector("#liq-cme").textContent = openGaps.length ? `${openGaps[0].direction} ($${openGaps[0].gap_size.toFixed(0)})` : "None";
+    liqBar.hidden = false;
+  } else {
+    liqBar.hidden = true;
+  }
+
+  drawMarketChart(data.bars, data.liquidity);
+
+  if (data.provider === "binance") {
+    connectBinanceWebSocket(data.symbol, data.interval);
+  } else {
+    disconnectBinanceWebSocket();
+  }
 }
 
-function drawMarketChart(bars) {
+function drawMarketChart(bars, liquidity = null) {
   const bounds = marketChart.getBoundingClientRect();
   if (!bounds.width || !bars.length) return;
   const ratio = window.devicePixelRatio || 1;
@@ -539,6 +642,48 @@ function drawMarketChart(bars) {
     context.stroke();
     context.fillStyle = "#8494ab";
     context.fillText(value.toFixed(2), left - 8, y);
+  }
+
+  // Draw Volume Profile levels if present
+  const vp = liquidity?.volume_profile;
+  if (vp && vp.poc >= minimum && vp.poc <= maximum) {
+    // POC Line (Amber / Gold)
+    const yPoc = Math.round(yAt(vp.poc)) + 0.5;
+    context.strokeStyle = "rgba(240, 173, 61, 0.85)";
+    context.lineWidth = 1.2;
+    context.setLineDash([4, 4]);
+    context.beginPath();
+    context.moveTo(left, yPoc);
+    context.lineTo(right, yPoc);
+    context.stroke();
+    context.fillStyle = "#f0ad3d";
+    context.textAlign = "right";
+    context.fillText(`POC $${vp.poc.toFixed(1)}`, right - 4, yPoc - 4);
+
+    // VAH Line (Cyan)
+    if (vp.vah >= minimum && vp.vah <= maximum) {
+      const yVah = Math.round(yAt(vp.vah)) + 0.5;
+      context.strokeStyle = "rgba(50, 214, 237, 0.65)";
+      context.beginPath();
+      context.moveTo(left, yVah);
+      context.lineTo(right, yVah);
+      context.stroke();
+      context.fillStyle = "#32d6ed";
+      context.fillText(`VAH $${vp.vah.toFixed(1)}`, right - 4, yVah - 4);
+    }
+
+    // VAL Line (Cyan)
+    if (vp.val >= minimum && vp.val <= maximum) {
+      const yVal = Math.round(yAt(vp.val)) + 0.5;
+      context.strokeStyle = "rgba(50, 214, 237, 0.65)";
+      context.beginPath();
+      context.moveTo(left, yVal);
+      context.lineTo(right, yVal);
+      context.stroke();
+      context.fillStyle = "#32d6ed";
+      context.fillText(`VAL $${vp.val.toFixed(1)}`, right - 4, yVal + 10);
+    }
+    context.setLineDash([]);
   }
 
   context.beginPath();
@@ -630,6 +775,8 @@ function renderBacktest(result, sourceLabel) {
   document.querySelector("#metric-total-return").textContent = formatPercent(metrics.total_return);
   document.querySelector("#metric-annualized-return").textContent = formatPercent(metrics.annualized_return);
   document.querySelector("#metric-sharpe").textContent = formatNumber(metrics.sharpe_ratio);
+  document.querySelector("#metric-sortino").textContent = formatNumber(metrics.sortino_ratio);
+  document.querySelector("#metric-calmar").textContent = formatNumber(metrics.calmar_ratio);
   document.querySelector("#metric-max-drawdown").textContent = formatPercent(metrics.max_drawdown);
   document.querySelector("#metric-volatility").textContent = formatPercent(metrics.annualized_volatility);
   document.querySelector("#result-period").textContent = `${result.start_date.slice(0, 10)} — ${result.end_date.slice(0, 10)}`;
@@ -731,3 +878,77 @@ if (selectedBroker) {
 }
 
 loadPortfolio(currentBroker);
+
+// --- Position Sizing & Kelly Calculator ---
+function updateKellyCalculator() {
+  const winRateEl = document.querySelector("#calc-win-rate");
+  const winLossEl = document.querySelector("#calc-win-loss");
+  const equityEl = document.querySelector("#calc-equity");
+  const riskPctEl = document.querySelector("#calc-risk-pct");
+  if (!winRateEl || !winLossEl || !equityEl || !riskPctEl) return;
+
+  const winRate = Number(winRateEl.value) / 100.0;
+  const winLoss = Number(winLossEl.value);
+  const equity = Number(equityEl.value);
+  const riskPct = Number(riskPctEl.value) / 100.0;
+
+  // Kelly formula: f* = p - (1-p)/b
+  let fStar = 0.0;
+  if (winLoss > 0 && winRate > 0 && winRate < 1.0) {
+    fStar = winRate - ((1.0 - winRate) / winLoss);
+  }
+  const fClamped = Math.max(0.0, Math.min(1.0, fStar));
+  const halfKelly = fClamped * 0.5;
+
+  const halfKellyUsd = equity * halfKelly;
+  const fullKellyUsd = equity * fClamped;
+  const maxRiskLoss = equity * riskPct;
+  const expectancyR = (winRate * winLoss) - (1.0 - winRate);
+
+  const halfEl = document.querySelector("#out-half-kelly");
+  const halfUsdEl = document.querySelector("#out-half-kelly-usd");
+  const fullEl = document.querySelector("#out-full-kelly");
+  const fullUsdEl = document.querySelector("#out-full-kelly-usd");
+  const riskEl = document.querySelector("#out-risk-loss");
+  const expEl = document.querySelector("#out-expectancy");
+  const edgeEl = document.querySelector("#out-edge-status");
+
+  if (halfEl) halfEl.textContent = `${(halfKelly * 100).toFixed(1)}%`;
+  if (halfUsdEl) halfUsdEl.textContent = `$${halfKellyUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (fullEl) fullEl.textContent = `${(fClamped * 100).toFixed(1)}%`;
+  if (fullUsdEl) fullUsdEl.textContent = `$${fullKellyUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (riskEl) riskEl.textContent = `$${maxRiskLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (expEl) expEl.textContent = `${expectancyR >= 0 ? "+" : ""}${expectancyR.toFixed(2)} R`;
+
+  if (edgeEl) {
+    if (expectancyR > 0) {
+      edgeEl.textContent = "POSITIVE EDGE";
+      edgeEl.className = "output-sub edge-positive";
+    } else {
+      edgeEl.textContent = "NEGATIVE EDGE";
+      edgeEl.className = "output-sub edge-negative";
+    }
+  }
+}
+
+["#calc-win-rate", "#calc-win-loss", "#calc-equity", "#calc-risk-pct"].forEach((selector) => {
+  const el = document.querySelector(selector);
+  if (el) el.addEventListener("input", updateKellyCalculator);
+});
+
+const syncEquityBtn = document.querySelector("#calc-sync-equity");
+if (syncEquityBtn) {
+  syncEquityBtn.addEventListener("click", () => {
+    const eqText = document.querySelector("#metric-equity")?.textContent || "";
+    const parsed = parseFloat(eqText.replace(/[^0-9.]/g, ""));
+    if (parsed && Number.isFinite(parsed) && parsed > 0) {
+      const eqInput = document.querySelector("#calc-equity");
+      if (eqInput) {
+        eqInput.value = Math.round(parsed);
+        updateKellyCalculator();
+      }
+    }
+  });
+}
+
+updateKellyCalculator();

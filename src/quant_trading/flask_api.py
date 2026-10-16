@@ -199,11 +199,12 @@ def analyze_market_route():
         "strategy_settings": settings,
     }
     prompt = (
-        "You are a quantitative research assistant. Analyze the supplied market context, settings, "
-        "Volume Profile (POC, VAH, VAL, LVN), and institutional price action structure (swing pivots, liquidity sweeps, rejection wicks). "
-        "Separate observed data from hypotheses, state that prices may be delayed, discuss risks, and never "
-        "claim certainty or issue an order. If asked to optimize, suggest parameter candidates and say they "
-        "must be backtested out of sample; do not claim to have optimized unless results are supplied. "
+        "You are an institutional Price Action quantitative analyst operating under a strict NON-PREDICTIVE mandate. "
+        "Never attempt to forecast or predict future price direction. Evaluate the current market structure objectively based ONLY on confirmed Price Action triggers: "
+        "swing pivots (higher highs, lower lows), liquidity sweeps, rejection wicks, Breaks of Structure (BOS), Change of Character (ChoCH), and Volume Profile boundaries (POC, VAH, VAL). "
+        "Separate observed structural facts from hypotheses, state that prices may be delayed, discuss risks, anchor stop losses strictly to structural wick levels with a minimum 1:2 Risk/Reward ratio, "
+        "and if no confirmed structural setup is printing, recommend HOLD. "
+        "If asked to optimize, suggest parameter candidates and say they must be backtested out of sample; do not claim to have optimized unless results are supplied. "
         f"User question: {question}\nMarket context JSON: {json.dumps(context, separators=(',', ':'))}"
     )
     ollama_url = os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434").rstrip("/")
@@ -256,6 +257,21 @@ def _request_market_snapshot(values: Any) -> MarketSnapshot:
 
 
 def _snapshot_payload(snapshot: MarketSnapshot) -> dict[str, Any]:
+    liquidity: dict[str, Any] = {}
+    try:
+        from quant_trading.liquidity import calculate_volume_profile, estimate_liquidation_clusters, detect_cme_gaps
+        vp = calculate_volume_profile(snapshot.bars)
+        last_close = float(snapshot.bars[-1]["close"]) if snapshot.bars else 0.0
+        liq = estimate_liquidation_clusters(last_close)
+        gaps = detect_cme_gaps(snapshot.bars)
+        liquidity = {
+            "volume_profile": vp,
+            "liquidation_clusters": liq,
+            "cme_gaps": gaps,
+        }
+    except Exception:
+        liquidity = {}
+
     return {
         "provider": snapshot.provider,
         "symbol": snapshot.symbol,
@@ -263,6 +279,7 @@ def _snapshot_payload(snapshot: MarketSnapshot) -> dict[str, Any]:
         "quote": snapshot.quote,
         "bars": snapshot.bars,
         "summary": _market_summary(snapshot),
+        "liquidity": liquidity,
     }
 
 

@@ -1471,7 +1471,7 @@ main {
 
 .result-metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 8px;
   margin-top: 10px;
 }
@@ -1586,5 +1586,218 @@ main {
 
   .chart-frame {
     height: 190px;
+  }
+}
+
+/* --- Liquidity Bar & Levels --- */
+.liquidity-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+  background: var(--canvas-raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow-x: auto;
+}
+
+.liquidity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.liquidity-item .metric-label {
+  font-size: 8px;
+  color: var(--quiet);
+  letter-spacing: 0.4px;
+}
+
+.liquidity-item strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.color-gold {
+  color: var(--amber) !important;
+}
+
+.color-cyan {
+  color: var(--cyan) !important;
+}
+
+.color-purple {
+  color: var(--violet) !important;
+}
+
+/* --- Live WebSocket Badge & Real-Time Price Flash --- */
+.chart-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ws-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(80, 212, 161, 0.12);
+  border: 1px solid rgba(80, 212, 161, 0.35);
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.ws-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: ws-pulse 1.4s infinite;
+}
+
+@keyframes ws-pulse {
+  0% { transform: scale(0.9); opacity: 0.5; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.5; }
+}
+
+@keyframes flash-up {
+  0% { color: #50d4a1; }
+  100% { color: inherit; }
+}
+
+@keyframes flash-down {
+  0% { color: #f25555; }
+  100% { color: inherit; }
+}
+
+.price-up {
+  animation: flash-up 0.8s ease-out;
+}
+
+.price-down {
+  animation: flash-down 0.8s ease-out;
+}
+
+/* --- Position Sizing & Kelly Calculator Panel --- */
+.sizing-panel {
+  margin-top: 24px;
+}
+
+.sizing-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.4fr);
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.sizing-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background: var(--canvas-raised);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 6px;
+}
+
+.input-with-button input {
+  flex: 1;
+  min-width: 0;
+}
+
+.button-small {
+  background: var(--panel-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 0 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.button-small:hover {
+  background: var(--line-strong);
+  color: var(--text);
+}
+
+.sizing-outputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.output-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--canvas-raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.output-recommended {
+  border-color: rgba(67, 133, 245, 0.45);
+  background: rgba(67, 133, 245, 0.06);
+}
+
+.output-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--quiet);
+  letter-spacing: 0.5px;
+}
+
+.output-recommended .output-label {
+  color: var(--blue-hover);
+  font-weight: 600;
+}
+
+.output-card strong {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 4px 0 2px;
+}
+
+.output-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.edge-positive {
+  color: var(--green) !important;
+  font-weight: 600;
+}
+
+.edge-negative {
+  color: #f25555 !important;
+  font-weight: 600;
+}
+
+@media (max-width: 860px) {
+  .sizing-grid {
+    grid-template-columns: 1fr;
   }
 }

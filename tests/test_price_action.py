@@ -177,3 +177,91 @@ def test_subagent_price_action_metrics(monkeypatch) -> None:
     assert "bos_detected" in metrics
     assert "swing_high" in metrics
     assert "swing_low" in metrics
+
+
+def test_detect_change_of_character() -> None:
+    strat = PriceActionStrategy(pivot_window=2)
+    now = datetime.now(timezone.utc)
+
+    # Build established downtrend:
+    # Swing High 1 at 120 (index 2), Swing Low 1 at 100 (index 5),
+    # Swing High 2 at 110 (index 8, LH), Swing Low 2 at 90 (index 11, LL)
+    bars = [
+        BarEvent(symbol="BTC", timeframe="1h", open=115.0, high=116.0, low=114.0, close=115.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="BTC", timeframe="1h", open=118.0, high=119.0, low=117.0, close=118.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="BTC", timeframe="1h", open=119.0, high=121.0, low=118.5, close=120.0, volume=10.0, timestamp=now),  # High 1: 121
+        BarEvent(symbol="BTC", timeframe="1h", open=115.0, high=116.0, low=114.0, close=115.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="BTC", timeframe="1h", open=108.0, high=109.0, low=107.0, close=108.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="BTC", timeframe="1h", open=102.0, high=103.0, low=99.0, close=101.0, volume=10.0, timestamp=now),    # Low 1: 99
+        BarEvent(symbol="BTC", timeframe="1h", open=105.0, high=106.0, low=104.0, close=105.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="BTC", timeframe="1h", open=108.0, high=109.0, low=107.0, close=108.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="BTC", timeframe="1h", open=109.0, high=111.0, low=108.0, close=110.0, volume=10.0, timestamp=now),  # High 2 (LH): 111
+        BarEvent(symbol="BTC", timeframe="1h", open=100.0, high=101.0, low=99.0, close=100.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="BTC", timeframe="1h", open=94.0, high=95.0, low=93.0, close=94.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="BTC", timeframe="1h", open=91.0, high=92.0, low=89.0, close=90.0, volume=10.0, timestamp=now),      # Low 2 (LL): 89
+        BarEvent(symbol="BTC", timeframe="1h", open=95.0, high=96.0, low=94.0, close=95.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="BTC", timeframe="1h", open=102.0, high=103.0, low=101.0, close=102.0, volume=10.0, timestamp=now),
+    ]
+
+    # Reversal candle closing decisively above Swing High 2 (111.0) -> e.g. close at 115.0
+    choch_bar = BarEvent(symbol="BTC", timeframe="1h", open=104.0, high=115.5, low=103.5, close=115.0, volume=50.0, timestamp=now)
+    all_bars = bars + [choch_bar]
+
+    analysis = strat.analyze_market_structure(all_bars)
+    assert analysis["trend"] == "DOWNTREND"
+    assert analysis["choch_detected"] is True
+    assert analysis["choch_type"] == "bullish"
+    assert analysis["signal_type"] == "BUY"
+    assert analysis["suggested_sl"] <= 103.5  # Invalidation below reversal impulse
+    assert analysis["suggested_tp"] > choch_bar.close
+
+
+def test_detect_fair_value_gap_mitigation() -> None:
+    strat = PriceActionStrategy(pivot_window=2)
+    now = datetime.now(timezone.utc)
+
+    # 1. Bar 0: high at 100.0
+    # 2. Bar 1: impulse candle
+    # 3. Bar 2: low at 104.0 -> Bullish FVG created between [100.0, 104.0]
+    bars = [
+        BarEvent(symbol="ETH", timeframe="1h", open=98.0, high=100.0, low=97.0, close=99.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="ETH", timeframe="1h", open=100.0, high=106.0, low=99.5, close=105.0, volume=50.0, timestamp=now),
+        BarEvent(symbol="ETH", timeframe="1h", open=105.0, high=108.0, low=104.0, close=107.0, volume=30.0, timestamp=now),
+        BarEvent(symbol="ETH", timeframe="1h", open=107.0, high=108.0, low=106.0, close=107.0, volume=10.0, timestamp=now),
+        BarEvent(symbol="ETH", timeframe="1h", open=107.0, high=107.5, low=105.5, close=106.5, volume=10.0, timestamp=now),
+    ]
+
+    fvgs = strat.detect_fair_value_gaps(bars)
+    assert len(fvgs) >= 1
+    assert any(f["type"] == "bullish" and f["bottom"] == 100.0 and f["top"] == 104.0 for f in fvgs)
+
+    # 4. Retest candle dips into the FVG (e.g. low=102.0), closes at 105.5 with rejection lower wick (range: 106.0 - 102.0 = 4.0; lower wick: 104.5 - 102.0 = 2.5 -> ratio: 2.5/4 = 0.625)
+    retest_bar = BarEvent(symbol="ETH", timeframe="1h", open=104.5, high=106.0, low=102.0, close=105.5, volume=40.0, timestamp=now)
+    all_bars = bars + [retest_bar]
+
+    analysis = strat.analyze_market_structure(all_bars)
+    assert analysis["fvg_detected"] is True
+    assert analysis["fvg_type"] == "bullish_mitigation"
+    assert analysis["signal_type"] == "BUY"
+    assert analysis["suggested_sl"] <= 100.0  # Invalidation below the FVG
+
+
+def test_non_predictive_hold_on_consolidation() -> None:
+    strat = PriceActionStrategy(pivot_window=2)
+    now = datetime.now(timezone.utc)
+
+    # 10 flat consolidating bars without sweep, breakout, or FVG
+    bars = [
+        BarEvent(symbol="SPY", timeframe="1h", open=500.0, high=501.0, low=499.0, close=500.0, volume=100.0, timestamp=now)
+        for _ in range(10)
+    ]
+
+    analysis = strat.analyze_market_structure(bars)
+    assert analysis["signal_type"] == "HOLD"
+    assert analysis["sweep_detected"] is False
+    assert analysis["bos_detected"] is False
+    assert analysis["choch_detected"] is False
+
+    sig = strat.on_bar(bars[-1], bars)
+    assert sig is None  # Strictly no trade executed on consolidation
+

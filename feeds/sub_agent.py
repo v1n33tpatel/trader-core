@@ -239,7 +239,8 @@ class TwoTierQuantAgent:
     # --- Agent B: Quant Reasoner ---
     def run_reasoner(self, strategy_name: str, telemetry: Dict[str, Any]) -> Dict[str, Any]:
         prompt = f"""
-You are a quantitative strategist. Analyze the extracted telemetry and price action against our risk rules and produce a trading decision.
+You are a quantitative strategist executing a strictly REACTIVE, NON-PREDICTIVE institutional Price Action framework.
+DO NOT attempt to forecast or predict future market direction. React ONLY to verified price action patterns that have already printed.
 
 TELEMETRY CONTEXT:
 {json.dumps(telemetry, indent=2)}
@@ -248,18 +249,18 @@ ACTIVE STRATEGY:
 {strategy_name}
 
 RULES:
-1. BUY requires oversold RSI (<35), confirmed bullish liquidity sweep (rejection pinbar), or bullish break of structure (BOS).
-2. SELL/EXIT on overbought RSI (>70), bearish sweep (shooting star rejection), or bearish break of structure.
-3. If Price Action pattern is present (e.g. BULLISH_LIQUIDITY_SWEEP_PINBAR), prioritize the structural invalidation level as the suggested_sl.
-4. Ensure minimum 1:2 Risk/Reward ratio for suggested_tp vs suggested_sl.
-5. Use Volume Profile: Target entries near Value Area boundaries (VAH/VAL) or High Volume Nodes; use Low Volume Nodes (LVN) or opposite Value Area limits for take_profit.
-6. Invalidate trade if price breaches primary liquidation cluster or sweep wick level.
-7. Respect allocation limits ($50 max).
+1. NON-PREDICTIVE MANDATE: Never buy or sell based on predictive indicator guesses (e.g. oversold/overbought RSI alone is strictly forbidden as an entry trigger).
+2. CONFIRMED BUY TRIGGERS: Execute BUY only on a confirmed Bullish Liquidity Sweep (pinbar hammer rejecting below prior low), Bullish Break of Structure (BOS), Bullish Change of Character (ChoCH), or Bullish FVG Mitigation Retest.
+3. CONFIRMED SELL/EXIT TRIGGERS: Execute SELL/EXIT on a confirmed Bearish Liquidity Sweep (shooting star rejecting above prior high), Bearish BOS, Bearish ChoCH, or Bearish FVG Retest.
+4. STRUCTURAL INVALIDATION: Anchor suggested_sl strictly to the extreme structural wick of the pattern (below sweep low for BUY; above sweep high for SELL).
+5. MANDATORY 1:2 R:R: Ensure suggested_tp provides at least a 1:2 Risk-to-Reward ratio relative to the invalidation stop loss.
+6. MANDATORY HOLD: If no confirmed structural Price Action setup is currently active, return action "HOLD" with target_allocation_usd 0.0. Cash is a strategic position.
+7. ALLOCATION GUARDRAILS: Respect allocation limits ($50 max per trade).
 8. Return STRICT RAW JSON ONLY matching this schema:
 {{
   "action": "BUY" | "SELL" | "HOLD",
   "confidence": <float 0.0 to 1.0>,
-  "reason": "<concise summary>",
+  "reason": "<concise summary identifying the confirmed Price Action setup and invalidation level>",
   "target_allocation_usd": <float>,
   "suggested_sl": <float>,
   "suggested_tp": <float>
