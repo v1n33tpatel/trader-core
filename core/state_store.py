@@ -1,8 +1,13 @@
 import sqlite3, os
-from datetime import datetime
+from datetime import datetime, timezone
+
+DEFAULT_DB_PATH = os.getenv(
+    "TRADER_STATE_DB",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "trader_state.db"),
+)
 
 class StateStore:
-    def __init__(self, db_path: str = "/home/vineet/trader-core/trader_state.db"):
+    def __init__(self, db_path: str = DEFAULT_DB_PATH):
         self.db_path = db_path
         self._init_db()
 
@@ -33,6 +38,6 @@ class StateStore:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO positions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (position_id, symbol, broker, side, units, price, price, datetime.utcnow())
+                (position_id, symbol, broker, side, units, price, price, datetime.now(timezone.utc))
             )
             conn.commit()

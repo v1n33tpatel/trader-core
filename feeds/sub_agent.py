@@ -1,3 +1,4 @@
+import os
 import re
 import json
 import requests
@@ -6,17 +7,18 @@ from typing import Dict, Any, List
 class TwoTierQuantAgent:
     """
     Two-Tier Sub-Agent Pipeline:
-    Agent A (Llama 3.1 8B): Calls tools and structures technical context.
-    Agent B (DeepSeek-R1 7B): Strategic reasoning and risk-governed execution decisions.
+    Agent A (Llama 3.1 8B): Calls tools and structures technical & price action context.
+    Agent B (DeepSeek-R1 7B): Strategic reasoning, institutional market structure analysis, and execution decisions.
     """
     def __init__(
         self,
-        ollama_endpoint: str = "http://10.10.10.15:11434",
+        ollama_endpoint: str = None,
         dispatcher_model: str = "llama3.1:8b",
         reasoner_model: str = "deepseek-r1:7b"
     ):
-        self.endpoint = f"{ollama_endpoint}/api/chat"
-        self.generate_url = f"{ollama_endpoint}/api/generate"
+        base = (ollama_endpoint or os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")).rstrip("/")
+        self.endpoint = f"{base}/api/chat"
+        self.generate_url = f"{base}/api/generate"
         self.dispatcher_model = dispatcher_model
         self.reasoner_model = reasoner_model
 
@@ -62,6 +64,32 @@ class TwoTierQuantAgent:
             return {"error": str(e)}
 
     @staticmethod
+    def get_price_action_metrics(symbol: str) -> Dict[str, Any]:
+        """Fetch candles and analyze swing pivots, sweeps, pinbar rejections, and BOS."""
+        pair = f"{symbol.upper()}USDT" if not symbol.endswith("USDT") else symbol.upper()
+        try:
+            r = requests.get(f"https://api.binance.com/api/v3/klines?symbol={pair}&interval=1h&limit=50", timeout=5)
+            if r.status_code != 200:
+                return {"error": f"Failed Binance API response: {r.status_code}"}
+            candles = [
+                {
+                    "open": float(k[1]),
+                    "high": float(k[2]),
+                    "low": float(k[3]),
+                    "close": float(k[4]),
+                    "volume": float(k[5]),
+                }
+                for k in r.json()
+            ]
+            from strategies.price_action import PriceActionStrategy
+            strat = PriceActionStrategy()
+            structure = strat.analyze_market_structure(candles)
+            structure["symbol"] = symbol.upper()
+            return structure
+        except Exception as e:
+            return {"error": str(e)}
+
+    @staticmethod
     def get_broker_risk_envelope() -> Dict[str, Any]:
         """Fetch internal risk parameters and portfolio balance limits."""
         return {
@@ -91,6 +119,20 @@ class TwoTierQuantAgent:
             {
                 "type": "function",
                 "function": {
+                    "name": "get_price_action_metrics",
+                    "description": "Fetch institutional market structure, swing pivots, liquidity sweeps, pinbar rejections, and BOS.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "symbol": {"type": "string", "description": "Ticker symbol, e.g. ETH, BTC, SOL"}
+                        },
+                        "required": ["symbol"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "get_broker_risk_envelope",
                     "description": "Get runtime risk rules, max allocation size, and position caps.",
                     "parameters": {"type": "object", "properties": {}}
@@ -99,7 +141,7 @@ class TwoTierQuantAgent:
         ]
 
         messages = [
-            {"role": "system", "content": "You are a tool dispatcher. Call the necessary tools to gather telemetry before handing off to reasoning."},
+            {"role": "system", "content": "You are a tool dispatcher. Call the necessary tools to gather market, price action, and risk telemetry before handing off to reasoning."},
             {"role": "user", "content": user_query}
         ]
 
@@ -120,6 +162,9 @@ class TwoTierQuantAgent:
                 if fn_name == "get_binance_metrics":
                     sym = args.get("symbol", "ETH")
                     tool_results["market_data"] = self.get_binance_metrics(sym)
+                elif fn_name == "get_price_action_metrics":
+                    sym = args.get("symbol", "ETH")
+                    tool_results["price_action"] = self.get_price_action_metrics(sym)
                 elif fn_name == "get_broker_risk_envelope":
                     tool_results["risk_rules"] = self.get_broker_risk_envelope()
 
@@ -127,10 +172,12 @@ class TwoTierQuantAgent:
             tool_results["dispatcher_fallback"] = str(e)
 
         # Fallback if dispatcher fails or detects no tools
+        match = re.search(r"\b(ETH|BTC|SOL|ADA|AVAX|XRP|DOGE)\b", user_query.upper())
+        target_sym = match.group(1) if match else "ETH"
         if "market_data" not in tool_results:
-            match = re.search(r"\b(ETH|BTC|SOL|ADA|AVAX|XRP|DOGE)\b", user_query.upper())
-            target_sym = match.group(1) if match else "ETH"
             tool_results["market_data"] = self.get_binance_metrics(target_sym)
+        if "price_action" not in tool_results:
+            tool_results["price_action"] = self.get_price_action_metrics(target_sym)
         if "risk_rules" not in tool_results:
             tool_results["risk_rules"] = self.get_broker_risk_envelope()
 
@@ -139,7 +186,7 @@ class TwoTierQuantAgent:
     # --- Agent B: Quant Reasoner ---
     def run_reasoner(self, strategy_name: str, telemetry: Dict[str, Any]) -> Dict[str, Any]:
         prompt = f"""
-You are a quantitative strategist. Analyze the extracted telemetry against our risk rules and produce a trading decision.
+You are a quantitative strategist. Analyze the extracted telemetry and price action against our risk rules and produce a trading decision.
 
 TELEMETRY CONTEXT:
 {json.dumps(telemetry, indent=2)}
@@ -148,9 +195,12 @@ ACTIVE STRATEGY:
 {strategy_name}
 
 RULES:
-1. BUY requires oversold RSI (<35) or bullish structure.
-2. Respect allocation and stop-loss limits.
-3. Return STRICT RAW JSON ONLY matching this schema:
+1. BUY requires oversold RSI (<35), confirmed bullish liquidity sweep (rejection pinbar), or bullish break of structure (BOS).
+2. SELL/EXIT on overbought RSI (>70), bearish sweep (shooting star rejection), or bearish break of structure.
+3. If Price Action pattern is present (e.g. BULLISH_LIQUIDITY_SWEEP_PINBAR), prioritize the structural invalidation level as the suggested_sl.
+4. Ensure minimum 1:2 Risk/Reward ratio for suggested_tp vs suggested_sl.
+5. Respect allocation limits ($50 max).
+6. Return STRICT RAW JSON ONLY matching this schema:
 {{
   "action": "BUY" | "SELL" | "HOLD",
   "confidence": <float 0.0 to 1.0>,
@@ -175,8 +225,8 @@ RULES:
             return {"action": "HOLD", "reason": f"Reasoner error: {str(e)}", "confidence": 0.0}
 
     # --- Full Pipeline Execution ---
-    def execute(self, query: str, strategy_name: str = "RSI_Mean_Reversion") -> Dict[str, Any]:
-        # Step 1: Agent A collects live data
+    def execute(self, query: str, strategy_name: str = "Price_Action") -> Dict[str, Any]:
+        # Step 1: Agent A collects live data & price action structure
         context = self.run_dispatcher(query)
         # Step 2: Agent B produces final execution parameters
         decision = self.run_reasoner(strategy_name, context)

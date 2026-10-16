@@ -1,23 +1,20 @@
 import os, sys, uuid, time, base64, requests
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 from flask import Flask, jsonify, request, render_template_string, make_response
+from quant_trading.flask_api import research_blueprint
 from brokers.t212_adapter import Trading212Broker
 try:
     from brokers.kraken_adapter import KrakenBroker
 except ImportError:
-    class KrakenBroker:
-        def __init__(self, *args, **kwargs): pass
-        def get_portfolio(self): return 0.0, []
+    KrakenBroker = None
 
 try:
-    sys.path.append("/opt/trader")
-    from binance_adapter import BinanceBroker
+    from brokers.binance_adapter import BinanceBroker
 except ImportError:
-    try:
-        from brokers.binance_adapter import BinanceBroker
-    except ImportError:
-        BinanceBroker = None
+    BinanceBroker = None
 
 app = Flask(__name__)
+app.register_blueprint(research_blueprint)
 OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")
 
 ETORO_PAIRS = {
@@ -32,17 +29,31 @@ ETORO_PAIRS = {
 }
 
 def load_etoro_headers():
-    env_paths = ["/home/vineet/trader-core/etoro.env", "/home/vineet/trader-core/config/etoro.env", "/home/vineet/feed-agent/etoro.env"]
-    api_key, user_key = "", ""
-    for p in env_paths:
-        if os.path.exists(p):
-            with open(p) as f:
-                for line in f:
-                    if "=" in line and not line.strip().startswith("#"):
-                        k, v = line.strip().split("=", 1)
-                        if k.strip() == "ETORO_API_KEY": api_key = v.strip().strip("\"' ")
-                        if k.strip() == "ETORO_USER_KEY": user_key = v.strip().strip("\"' ")
-            if api_key: break
+    api_key = os.getenv("ETORO_API_KEY", "").strip("\"' ")
+    user_key = os.getenv("ETORO_USER_KEY", "").strip("\"' ")
+    if not (api_key and user_key):
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        env_paths = [
+            os.path.join(root_dir, ".env"),
+            os.path.join(root_dir, "etoro.env"),
+            os.path.join(root_dir, "config", "etoro.env"),
+            "/home/vineet/feed-agent/etoro.env",
+        ]
+        for p in env_paths:
+            if api_key and user_key:
+                break
+            if os.path.exists(p):
+                try:
+                    with open(p, encoding="utf-8") as f:
+                        for line in f:
+                            if "=" in line and not line.strip().startswith("#"):
+                                k, v = line.strip().split("=", 1)
+                                if k.strip() == "ETORO_API_KEY" and not api_key:
+                                    api_key = v.strip().strip("\"' ")
+                                if k.strip() == "ETORO_USER_KEY" and not user_key:
+                                    user_key = v.strip().strip("\"' ")
+                except OSError:
+                    continue
     return {
         "x-api-key": api_key,
         "x-user-key": user_key,
@@ -470,7 +481,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 @app.route("/")
 def index():
-    resp = make_response(render_template_string(HTML_TEMPLATE))
+    dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
+    with open(dashboard_path, encoding="utf-8") as dashboard_file:
+        resp = make_response(dashboard_file.read())
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
@@ -639,7 +652,8 @@ def agent_query():
         "etoro": f"You are the eToro Crypto Agent. Evaluate {symbol} using 1H RSI mean-reversion and FVG structures. Risk limit is $50 max allocation. Give action: BUY, SELL, or HOLD.",
         "binance": f"You are the Binance Spot Scalping Agent. Evaluate {symbol} using 5m high-frequency candlestick momentum and order book depth. Give action: BUY, SELL, or HOLD.",
         "kraken": f"You are the Kraken Spot Agent. Evaluate {symbol} for multi-currency swing spot accumulation. Give action: BUY, SELL, or HOLD.",
-        "quantai": "You are QuantAI for MoneyMakingMachine - QWERTY CORP. Provide a concise cross-broker executive summary for Equities (T212) and Crypto (Binance/Kraken/eToro)."
+        "quantai": "You are QuantAI for MoneyMakingMachine - QWERTY CORP. Provide a concise cross-broker executive summary for Equities (T212) and Crypto (Binance/Kraken/eToro).",
+        "price_action": f"You are the Institutional Price Action & Market Structure Agent. Evaluate {symbol} using swing pivot levels, liquidity sweeps, pinbar rejections, and break of structure (BOS). Identify key invalidation levels and 1:2 Risk/Reward targets. Give action: BUY, SELL, or HOLD."
     }
     try:
         r = requests.post(f"{OLLAMA_URL}/api/generate", json={"model": "deepseek-r1:7b", "prompt": prompts.get(broker, prompts["t212"]), "stream": False}, timeout=35)

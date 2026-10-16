@@ -4,11 +4,16 @@ class Trading212Broker:
     def __init__(self, is_demo: bool = True):
         self.is_demo = is_demo
         self.base_url = "https://demo.trading212.com/api/v0" if is_demo else "https://live.trading212.com/api/v0"
-        env_path = "/home/vineet/feed-agent/t212.env"
-        self.api_key = ""
-        self.api_secret = ""
-        
-        if os.path.exists(env_path):
+        self.api_key = os.getenv("T212_API_KEY", "").strip().strip("\"' ")
+        self.api_secret = os.getenv("T212_API_SECRET", "").strip().strip("\"' ")
+        env_paths = (
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
+            "/home/vineet/feed-agent/t212.env",
+        )
+
+        for env_path in env_paths:
+            if self.api_key and self.api_secret:
+                break
             try:
                 with open(env_path) as ff:
                     for line in ff:
@@ -16,12 +21,12 @@ class Trading212Broker:
                             k, v = line.strip().split("=", 1)
                             key_clean = k.strip()
                             val_clean = v.strip().strip('"\' ')
-                            if "API_KEY" in key_clean:
+                            if key_clean == "T212_API_KEY" and not self.api_key:
                                 self.api_key = val_clean
-                            elif "API_SECRET" in key_clean:
+                            elif key_clean == "T212_API_SECRET" and not self.api_secret:
                                 self.api_secret = val_clean
-            except Exception:
-                pass
+            except OSError:
+                continue
 
     def _headers(self):
         credentials = f"{self.api_key}:{self.api_secret}"

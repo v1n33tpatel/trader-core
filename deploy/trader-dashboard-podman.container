@@ -1,0 +1,25 @@
+[Unit]
+Description=Trader Dashboard (Podman)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/trader-core-dashboard:latest
+ContainerName=trader-dashboard-podman
+WorkingDir=/app
+Exec=python main.py
+PublishPort=5000:5000
+Environment=OLLAMA_HOST=http://10.10.10.15:11434
+# Add host EnvironmentFile=/absolute/path/to/credentials.env for Binance/Kraken keys.
+Volume=/home/vineet/trader-core/.env:/app/.env:ro
+NoNewPrivileges=true
+ReadOnly=true
+Tmpfs=/tmp
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

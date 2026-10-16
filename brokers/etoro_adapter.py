@@ -1,26 +1,49 @@
 import os, uuid, requests
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from brokers.base import BaseBroker
 from models.position import Position
 from risk.throttler import RateThrottler
 
 class EtoroBroker(BaseBroker):
-    def __init__(self, env_path: str = "/home/vineet/feed-agent/etoro.env", is_demo: bool = True):
+    def __init__(self, env_path: str = None, is_demo: bool = True):
         self.is_demo = is_demo
         self.throttler = RateThrottler(1.2)
         self.api_key, self.user_key = self._load(env_path)
         self.id_to_sym = {100002: "ETH", 100001: "BTC", 100085: "SOL", 100015: "ADA", 100003: "XRP", 100067: "DOGE", 100095: "AVAX", 100005: "LTC"}
         self.sym_to_id = {v: k for k, v in self.id_to_sym.items()}
 
-    def _load(self, path):
-        ak, uk = "", ""
-        if os.path.exists(path):
-            with open(path) as f:
-                for l in f:
-                    if "=" in l and not l.strip().startswith("#"):
-                        k, v = l.strip().split("=", 1)
-                        if k.strip() == "ETORO_API_KEY": ak = v.strip().strip('"\' ')
-                        if k.strip() == "ETORO_USER_KEY": uk = v.strip().strip('"\' ')
+    def _load(self, path: Optional[str] = None):
+        ak = os.getenv("ETORO_API_KEY", "").strip().strip("\"' ")
+        uk = os.getenv("ETORO_USER_KEY", "").strip().strip("\"' ")
+        if ak and uk:
+            return ak, uk
+
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        paths = []
+        if path:
+            paths.append(path)
+        paths.extend([
+            os.path.join(root_dir, ".env"),
+            os.path.join(root_dir, "etoro.env"),
+            os.path.join(root_dir, "config", "etoro.env"),
+            "/home/vineet/feed-agent/etoro.env",
+        ])
+
+        for p in paths:
+            if ak and uk:
+                break
+            if os.path.exists(p):
+                try:
+                    with open(p, encoding="utf-8") as f:
+                        for l in f:
+                            if "=" in l and not l.strip().startswith("#"):
+                                k, v = l.strip().split("=", 1)
+                                if k.strip() == "ETORO_API_KEY" and not ak:
+                                    ak = v.strip().strip("\"' ")
+                                if k.strip() == "ETORO_USER_KEY" and not uk:
+                                    uk = v.strip().strip("\"' ")
+                except OSError:
+                    continue
         return ak, uk
 
     def _headers(self):

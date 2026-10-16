@@ -27,6 +27,11 @@ STRATEGY_CATALOG = {
             "name": "Fair Value Gap (FVG) Breakout",
             "description": "Trades 3-candle imbalance retests with ATR stops.",
             "params": {"fvg_threshold_pct": 1.5, "tp_pct": 4.5, "sl_pct": 2.0}
+        },
+        "price_action": {
+            "name": "Institutional Price Action & Market Structure",
+            "description": "Trades swing pivots, liquidity sweeps, pinbar rejections, and break of structure (BOS).",
+            "params": {"pivot_window": 5, "min_wick_ratio": 0.50, "risk_reward_ratio": 2.0, "max_sl_pct": 3.5}
         }
     },
     "etf": {

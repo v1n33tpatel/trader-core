@@ -8,6 +8,7 @@ from strategies.etf.sma_macro_regime import SmaMacroRegimeStrategy
 from strategies.etf.dynamic_dca import DynamicDcaStrategy
 from strategies.forex.london_ny_overlap import LondonNyOverlapStrategy
 from strategies.forex.carry_rsi_swing import CarryRsiSwingStrategy
+from strategies.price_action import PriceActionStrategy
 
 STRATEGY_MAP = {
     "rsi_reversion": RsiMeanReversionStrategy,
@@ -17,7 +18,8 @@ STRATEGY_MAP = {
     "dividend_dca": DynamicDcaStrategy,
     "dynamic_dca": DynamicDcaStrategy,
     "london_ny_overlap": LondonNyOverlapStrategy,
-    "forex_rsi_swing": CarryRsiSwingStrategy
+    "forex_rsi_swing": CarryRsiSwingStrategy,
+    "price_action": PriceActionStrategy,
 }
 
 def get_strategy_instance(strategy_key: str, category: str = "crypto") -> Optional[BaseStrategy]:

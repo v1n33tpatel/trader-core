@@ -1,5 +1,5 @@
 import time, sys, os
-sys.path.insert(0, "/home/vineet/trader-core")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from models.events import BarEvent, SignalSide
 from feeds.binance_feed import BinanceFeed

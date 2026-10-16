@@ -1,74 +1,27 @@
 import os, sys, uuid, time, base64, hashlib, hmac, urllib.parse, requests
-sys.path.insert(0, "/home/vineet/trader-core")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 from flask import Flask, jsonify, request, render_template_string, make_response
+from quant_trading.flask_api import research_blueprint
 
 try:
     from brokers.t212_adapter import Trading212Broker
 except Exception:
     Trading212Broker = None
 
+try:
+    from brokers.kraken_adapter import KrakenBroker
+except Exception:
+    KrakenBroker = None
+
+try:
+    from brokers.binance_adapter import BinanceBroker
+except Exception:
+    BinanceBroker = None
+
 app = Flask(__name__)
+app.register_blueprint(research_blueprint)
 OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")
-
-class KrakenBroker:
-    def __init__(self):
-        self.base_url = "https://api.kraken.com"
-        self.api_key = os.getenv("KRAKEN_API_KEY", "").strip("\"' ")
-        self.api_secret = os.getenv("KRAKEN_API_SECRET", "").strip("\"' ")
-
-    def _headers(self, urlpath, data):
-        postdata = urllib.parse.urlencode(data)
-        encoded = (str(data["nonce"]) + postdata).encode()
-        message = urlpath.encode() + hashlib.sha256(encoded).digest()
-        mac = hmac.new(base64.b64decode(self.api_secret), message, hashlib.sha512)
-        return {"API-Key": self.api_key, "API-Sign": base64.b64encode(mac.digest()).decode()}
-
-    def get_portfolio(self):
-        if not self.api_key or not self.api_secret:
-            return 0.0, []
-        try:
-            urlpath = "/0/private/Balance"
-            data = {"nonce": int(time.time() * 1000)}
-            r = requests.post(self.base_url + urlpath, headers=self._headers(urlpath, data), data=data, timeout=5)
-            res = r.json()
-            if res.get("error"): return 0.0, []
-            balances = res.get("result", {})
-            cash = float(balances.get("ZUSD", 0.0)) + float(balances.get("USD", 0.0)) + float(balances.get("USDT", 0.0))
-            positions = []
-            for asset, qty_str in balances.items():
-                qty = float(qty_str)
-                clean = asset.replace("X", "").replace("Z", "")
-                if qty > 0.0001 and clean not in ["USD", "EUR", "GBP", "USDT"]:
-                    positions.append({"ticker": clean, "units": qty, "strategy": "Spot Swing Hold", "status": "ACTIVE"})
-            return cash, positions
-        except Exception:
-            return 0.0, []
-
-class BinanceBroker:
-    def __init__(self):
-        self.base_url = "https://api.binance.com"
-        self.api_key = os.getenv("BINANCE_API_KEY", "").strip("\"' ")
-        self.api_secret = os.getenv("BINANCE_API_SECRET", "").strip("\"' ")
-
-    def get_portfolio(self):
-        if not self.api_key or not self.api_secret:
-            return 0.0, []
-        try:
-            params = {"timestamp": int(time.time() * 1000)}
-            query = urllib.parse.urlencode(params)
-            params["signature"] = hmac.new(self.api_secret.encode(), query.encode(), hashlib.sha256).hexdigest()
-            r = requests.get(self.base_url + "/api/v3/account", headers={"X-MBX-APIKEY": self.api_key}, params=params, timeout=5)
-            if r.status_code != 200: return 0.0, []
-            balances = r.json().get("balances", [])
-            cash = sum(float(b["free"]) for b in balances if b["asset"] in ["USDT", "FDUSD", "USDC"])
-            positions = []
-            for b in balances:
-                qty = float(b.get("free", 0.0)) + float(b.get("locked", 0.0))
-                if qty > 0 and b["asset"] not in ["USDT", "FDUSD", "USDC"]:
-                    positions.append({"ticker": b["asset"] + "USDT", "units": qty, "open_price": 0.0, "strategy": "5m Kline Momentum", "status": "ACTIVE"})
-            return cash, positions
-        except Exception:
-            return 0.0, []
 
 ETORO_PAIRS = {
     "ETH": {"id": 100002, "strategy": "1H RSI Mean Reversion"},
@@ -82,15 +35,31 @@ ETORO_PAIRS = {
 }
 
 def load_etoro_headers():
-    env_path = "/home/vineet/feed-agent/etoro.env"
-    api_key, user_key = "", ""
-    if os.path.exists(env_path):
-        with open(env_path) as f:
-            for line in f:
-                if "=" in line and not line.strip().startswith("#"):
-                    k, v = line.strip().split("=", 1)
-                    if k.strip() == "ETORO_API_KEY": api_key = v.strip().strip("\"' ")
-                    if k.strip() == "ETORO_USER_KEY": user_key = v.strip().strip("\"' ")
+    api_key = os.getenv("ETORO_API_KEY", "").strip("\"' ")
+    user_key = os.getenv("ETORO_USER_KEY", "").strip("\"' ")
+    if not (api_key and user_key):
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        paths = [
+            os.path.join(root_dir, ".env"),
+            os.path.join(root_dir, "etoro.env"),
+            os.path.join(root_dir, "config", "etoro.env"),
+            "/home/vineet/feed-agent/etoro.env",
+        ]
+        for env_path in paths:
+            if api_key and user_key:
+                break
+            if os.path.exists(env_path):
+                try:
+                    with open(env_path, encoding="utf-8") as f:
+                        for line in f:
+                            if "=" in line and not line.strip().startswith("#"):
+                                k, v = line.strip().split("=", 1)
+                                if k.strip() == "ETORO_API_KEY" and not api_key:
+                                    api_key = v.strip().strip("\"' ")
+                                if k.strip() == "ETORO_USER_KEY" and not user_key:
+                                    user_key = v.strip().strip("\"' ")
+                except OSError:
+                    continue
     return {"x-api-key": api_key, "x-user-key": user_key, "x-request-id": str(uuid.uuid4()), "Content-Type": "application/json"}
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -504,7 +473,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 @app.route("/")
 def index():
-    resp = make_response(open("/home/vineet/trader-core/dashboard.html").read())
+    dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
+    with open(dashboard_path, encoding="utf-8") as dashboard_file:
+        resp = make_response(dashboard_file.read())
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
@@ -637,8 +608,8 @@ def agent_query():
         "t212": f"You are the Trading 212 Equities & ETF Agent. Evaluate {symbol} under the 200-day SMA macro regime and Dividend DCA rules. Hard stop-loss is -2.0%. Give action: BUY, SELL, or HOLD.",
         "etoro": f"You are the eToro Crypto Agent. Evaluate {symbol} using 1H RSI mean-reversion and FVG structures. Risk limit is $50 max allocation. Give action: BUY, SELL, or HOLD.",
         "binance": f"You are the Binance Spot Scalping Agent. Evaluate {symbol} using 5m high-frequency candlestick momentum and order book depth. Give action: BUY, SELL, or HOLD.",
-        "kraken": f"You are the Kraken Spot Agent. Evaluate {symbol} for multi-currency swing spot accumulation. Give action: BUY, SELL, or HOLD.",
-        "quantai": "You are QuantAI for MoneyMakingMachine - QWERTY CORP. Provide a concise cross-broker executive summary for Equities (T212) and Crypto (Binance/Kraken/eToro)."
+        "quantai": "You are QuantAI for MoneyMakingMachine - QWERTY CORP. Provide a concise cross-broker executive summary for Equities (T212) and Crypto (Binance/Kraken/eToro).",
+        "price_action": f"You are the Institutional Price Action & Market Structure Agent. Evaluate {symbol} using swing pivot levels, liquidity sweeps, pinbar rejections, and break of structure (BOS). Identify key invalidation levels and 1:2 Risk/Reward targets. Give action: BUY, SELL, or HOLD."
     }
     try:
         r = requests.post(f"{OLLAMA_URL}/api/generate", json={"model": "deepseek-r1:7b", "prompt": prompts.get(broker, prompts["t212"]), "stream": False}, timeout=35)

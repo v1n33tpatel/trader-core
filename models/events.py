@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Dict, Any
 
@@ -25,7 +25,7 @@ class BarEvent:
     low: float
     close: float
     volume: float
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 @dataclass(frozen=True)
 class SignalEvent:
@@ -36,7 +36,7 @@ class SignalEvent:
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 @dataclass(frozen=True)
 class OrderEvent:

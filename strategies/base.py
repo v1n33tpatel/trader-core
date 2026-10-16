@@ -29,3 +29,13 @@ class BaseStrategy(ABC):
     @abstractmethod
     def evaluate(self, symbol: str, bars: List[Bar], current_positions: List[Dict[str, Any]], macro_context: Optional[Dict[str, Any]] = None) -> StrategySignal:
         pass
+
+
+class BaseEventStrategy(ABC):
+    def __init__(self, name: str, params: Dict[str, Any]):
+        self.name = name
+        self.params = params
+
+    @abstractmethod
+    def on_bar(self, bar: Any, history: List[Any]) -> Any:
+        pass

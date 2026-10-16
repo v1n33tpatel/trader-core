@@ -1,417 +1,317 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>MoneyMakingMachine - QWERTY CORP</title>
-    <style>
-        :root { --bg: #0b0f19; --card: #151e32; --border: #24324f; --text: #f8fafc; --muted: #94a3b8; --green: #10b981; --red: #ef4444; --blue: #3b82f6; --purple: #8b5cf6; --amber: #f59e0b; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 20px; }
-        .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px; overflow-x: auto; }
-        .tab-btn { background: #1e293b; color: var(--muted); border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: 0.15s; }
-        .tab-btn:hover, .tab-btn.active { background: var(--blue); color: #fff; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 18px; margin-bottom: 20px; }
-        .card-label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; }
-        .card-val { font-size: 1.5rem; font-weight: 700; margin-top: 5px; }
-        .btn { cursor: pointer; padding: 8px 14px; border: none; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: 0.15s; }
-        .btn:active { transform: scale(0.97); }
-        .btn-blue { background: var(--blue); color: white; }
-        .btn-purple { background: var(--purple); color: white; }
-        .btn-green { background: var(--green); color: white; }
-        .btn-red { background: var(--red); color: white; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
-        th { color: var(--muted); }
-        .badge { padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
-        .badge-strat { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
-        .search-container { display: flex; gap: 10px; margin-bottom: 15px; margin-top: 10px; }
-        .search-input { flex: 1; background: #070d1e; border: 1px solid var(--border); color: #fff; padding: 10px 14px; border-radius: 6px; font-size: 0.9rem; outline: none; }
-        .search-results { max-height: 260px; overflow-y: auto; background: #0c1326; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 15px; display: none; }
-        .ai-output { background: #070d1e; border: 1px solid #1e293b; border-radius: 6px; padding: 15px; font-size: 0.9rem; min-height: 60px; color: #38bdf8; white-space: pre-wrap; }
-    </style>
-</head>
-<body>
-<div class="container">
-    <div class="header">
-        <div>
-            <h1 style="margin:0; font-size: 1.5rem;">MoneyMakingMachine - QWERTY CORP</h1>
-            <span class="badge" style="background: rgba(245,158,11,0.2); color: var(--amber); border: 1px solid var(--amber); margin-top: 5px; display:inline-block;">QUANT MULTI-BROKER</span>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b101a" />
+    <title>MoneyMakingMachine | Quant Workstation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-line">
+            <img class="brand-logo" src="/logo/MonetMakingMachine-logo.jpg" alt="MoneyMakingMachine Trading Bot" />
+            <div>
+              <h1>MoneyMakingMachine <span class="brand-divider">/</span> QWERTY CORP</h1>
+              <span class="product-tag">QUANT MULTI-BROKER</span>
+            </div>
+          </div>
+          <div class="connection-state"><span class="status-dot"></span>BROKER APIs <span class="state-divider">·</span> DATA ON DEMAND</div>
         </div>
-        <div style="font-size: 0.85rem; color: var(--muted);">AI Inference Host: <strong style="color: #38bdf8;">10.10.10.15:11434</strong></div>
-    </div>
+        <div class="inference-state">
+          <span class="inference-label">API CONNECTIONS</span>
+          <div class="api-status-list" role="list" aria-label="API connection statuses">
+            <span class="api-status-item" data-api-status="dashboard" data-status="checking" role="listitem" title="Dashboard API: checking">
+              <span class="api-status-dot" aria-hidden="true"></span><span>APP</span>
+            </span>
+            <span class="api-status-item" data-api-status="t212" data-status="checking" role="listitem" title="Trading 212 API: checking">
+              <span class="api-status-dot" aria-hidden="true"></span><span>T212</span>
+            </span>
+            <span class="api-status-item" data-api-status="etoro" data-status="checking" role="listitem" title="eToro API: checking">
+              <span class="api-status-dot" aria-hidden="true"></span><span>ETORO</span>
+            </span>
+            <span class="api-status-item" data-api-status="yahoo" data-status="checking" role="listitem" title="Yahoo Finance API: checking">
+              <span class="api-status-dot" aria-hidden="true"></span><span>YF</span>
+            </span>
+            <span class="api-status-item" data-api-status="binance" data-status="checking" role="listitem" title="Binance API: checking">
+              <span class="api-status-dot" aria-hidden="true"></span><span>BN</span>
+            </span>
+            <span class="api-status-item" data-api-status="kraken" data-status="checking" role="listitem" title="Kraken API: checking">
+              <span class="api-status-dot" aria-hidden="true"></span><span>KR</span>
+            </span>
+            <span class="api-status-item" data-api-status="ollama" data-status="checking" role="listitem" title="Ollama API: checking">
+              <span class="api-status-dot" aria-hidden="true"></span><span>AI</span>
+            </span>
+          </div>
+          <span class="api-status-updated" id="api-status-updated" aria-live="polite">Checking APIs...</span>
+        </div>
+      </header>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('t212-tab', this)">Trading 212 (Invest)</button>
-        <button class="tab-btn" onclick="switchTab('etoro-tab', this)">eToro Quant Hub</button>
-        <button class="tab-btn" onclick="switchTab('binance-tab', this)">Binance Spot</button>
-        <button class="tab-btn" onclick="switchTab('kraken-tab', this)">Kraken Spot</button>
-        <button class="tab-btn" onclick="switchTab('quantai-tab', this)">QuantAI</button>
-    </div>
+      <nav class="broker-nav" aria-label="Broker workspaces" role="tablist">
+        <button class="broker-tab is-active" id="tab-t212" type="button" role="tab" aria-selected="true" data-broker="t212">Trading 212 <span>(Invest)</span></button>
+        <button class="broker-tab" id="tab-etoro" type="button" role="tab" aria-selected="false" data-broker="etoro">eToro Quant Hub</button>
+        <button class="broker-tab" id="tab-binance" type="button" role="tab" aria-selected="false" data-broker="binance">Binance Spot</button>
+        <button class="broker-tab" id="tab-kraken" type="button" role="tab" aria-selected="false" data-broker="kraken">Kraken Spot</button>
+        <button class="broker-tab" id="tab-quantai" type="button" role="tab" aria-selected="false" data-broker="quantai">QuantAI</button>
+      </nav>
 
-    <!-- 1. T212 TAB -->
-    <div id="t212-tab" class="tab-content">
-        <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; font-size:1.2rem;">Trading 212 Practice Portfolio (-2.0% Auto Stop-Loss Active)</h2>
-                <button class="btn btn-blue" onclick="fetchT212Portfolio()">Refresh T212</button>
+      <main>
+        <section class="panel portfolio-panel" aria-labelledby="portfolio-title">
+          <div class="section-heading">
+            <div class="heading-copy">
+              <div class="eyebrow">BROKER SNAPSHOT <span>·</span> ON-DEMAND REFRESH</div>
+              <h2 id="portfolio-title">Trading 212 Practice Portfolio</h2>
             </div>
-            <div class="grid" style="margin-top:15px;">
-                <div class="card"><div class="card-label">Cash Available</div><div id="t212-cash" class="card-val">$0.00</div></div>
-                <div class="card"><div class="card-label">Active Positions</div><div id="t212-pos-count" class="card-val">0</div></div>
-                <div class="card"><div class="card-label">Total Invested</div><div id="t212-invested" class="card-val">$0.00</div></div>
-                <div class="card"><div class="card-label">Unrealized P/L</div><div id="t212-pnl" class="card-val">$0.00</div></div>
-                <div class="card"><div class="card-label">Total Equity</div><div id="t212-equity" class="card-val">$0.00</div></div>
+            <div class="heading-actions">
+              <div class="risk-control">
+                <span class="risk-caption">2.0% STRATEGY STOP</span>
+                <span class="risk-state">RULE-BASED</span>
+              </div>
+              <button class="button button-refresh" id="refresh-button" type="button">
+                <span class="refresh-symbol" aria-hidden="true">↻</span>
+                <span>Refresh T212</span>
+              </button>
             </div>
-            <h3>Active Equity Holdings & Assigned Strategy</h3>
-            <table>
-                <thead><tr><th>Ticker</th><th>Strategy</th><th>Units</th><th>Open Price</th><th>Total Invested</th><th>P/L ($)</th><th>P/L (%)</th><th>Status</th></tr></thead>
-                <tbody id="t212-tbody"><tr><td colspan="8" style="text-align:center; color:var(--muted);">Loading positions...</td></tr></tbody>
+          </div>
+
+          <div class="metrics-grid" aria-label="Portfolio summary">
+            <article class="metric">
+              <span class="metric-label">CASH AVAILABLE</span>
+              <strong id="metric-cash">$0.00</strong>
+              <span class="metric-note">USD</span>
+            </article>
+            <article class="metric">
+              <span class="metric-label">ACTIVE POSITIONS</span>
+              <strong id="metric-position-count">0</strong>
+              <span class="metric-note">OPEN</span>
+            </article>
+            <article class="metric">
+              <span class="metric-label">TOTAL INVESTED</span>
+              <strong id="metric-invested">$0.00</strong>
+              <span class="metric-note">USD</span>
+            </article>
+            <article class="metric">
+              <span class="metric-label">UNREALIZED P/L</span>
+              <strong id="metric-pnl">$0.00</strong>
+              <span class="metric-note">0.00%</span>
+            </article>
+            <article class="metric metric-equity">
+              <span class="metric-label">TOTAL EQUITY</span>
+              <strong id="metric-equity">$0.00</strong>
+              <span class="metric-note">ACCOUNT SNAPSHOT</span>
+            </article>
+          </div>
+
+          <div class="holdings-heading">
+            <div>
+              <span class="eyebrow">POSITIONS <span>·</span> 00</span>
+              <h3>Active Equity Holdings <span class="heading-amp">&amp;</span> Assigned Strategy</h3>
+            </div>
+            <span class="table-status"><span class="status-dot status-dot-muted"></span>AWAITING DATA</span>
+          </div>
+
+          <div class="table-scroll">
+            <table class="holdings-table">
+              <thead>
+                <tr>
+                  <th scope="col">TICKER</th>
+                  <th scope="col">STRATEGY</th>
+                  <th scope="col">UNITS</th>
+                  <th scope="col">OPEN PRICE</th>
+                  <th scope="col">TOTAL INVESTED</th>
+                  <th scope="col">P/L ($)</th>
+                  <th scope="col">P/L (%)</th>
+                  <th scope="col">STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="8" class="empty-cell">
+                    <span class="empty-icon" aria-hidden="true">—</span>
+                    <span id="holdings-empty">Refresh this account to load positions.</span>
+                  </td>
+                </tr>
+              </tbody>
             </table>
-        </div>
-        <div class="card">
-            <h3 style="margin:0;">Search Stocks & ETFs on Trading 212</h3>
-            <div class="search-container">
-                <input type="text" id="t212-search-input" class="search-input" placeholder="Search by Ticker, ISIN, or Name (e.g. VUKE, SPY, Apple)..." onkeydown="if(event.key==='Enter') executeT212Search()">
-                <button class="btn btn-blue" onclick="executeT212Search()">Search T212</button>
+          </div>
+          <div class="panel-footnote" id="refresh-status" aria-live="polite">Select a broker or refresh to load its account snapshot.</div>
+        </section>
+
+        <section class="panel backtest-panel" aria-labelledby="backtest-title">
+          <div class="section-heading compact-heading backtest-heading">
+            <div>
+              <div class="eyebrow">PYTHON RESEARCH ENGINE <span>·</span> TIME-SERIES MOMENTUM</div>
+              <h2 id="backtest-title">Strategy Research <span class="heading-amp">/</span> Backtest</h2>
             </div>
-            <div id="t212-search-results" class="search-results">
-                <table><thead><tr><th>Ticker</th><th>Name</th><th>Type</th><th>Currency</th><th>Action</th></tr></thead><tbody id="t212-search-tbody"></tbody></table>
+            <span class="engine-badge"><span class="status-dot"></span>LOCAL ENGINE</span>
+          </div>
+          <form id="market-form" class="market-form">
+            <label class="field-control">
+              <span>DATA SOURCE</span>
+              <select id="market-provider">
+                <option value="yahoo" selected>Yahoo Finance · equities</option>
+                <option value="binance">Binance Spot · crypto</option>
+              </select>
+            </label>
+            <label class="field-control market-symbol-control">
+              <span>SYMBOL</span>
+              <input id="market-symbol" type="text" value="SPY" maxlength="32" autocomplete="off" required />
+            </label>
+            <label class="field-control">
+              <span>INTERVAL</span>
+              <select id="market-interval">
+                <option value="1d" selected>1 day</option>
+                <option value="1h">1 hour</option>
+                <option value="1wk">1 week</option>
+              </select>
+            </label>
+            <label class="field-control">
+              <span>HISTORY</span>
+              <select id="market-period">
+                <option value="3d">3 days</option>
+                <option value="1w">1 week</option>
+                <option value="1mo">1 month</option>
+                <option value="3mo">3 months</option>
+                <option value="6mo">6 months</option>
+                <option value="1y" selected>1 year</option>
+                <option value="2y">2 years</option>
+                <option value="5y">5 years</option>
+              </select>
+            </label>
+            <button class="button button-market" id="load-market-data" type="submit"><span aria-hidden="true">↻</span> Load data</button>
+          </form>
+          <div class="market-summary" id="market-summary" hidden>
+            <div><span class="metric-label">LATEST PRICE</span><strong id="market-quote">—</strong></div>
+            <div><span class="metric-label">PERIOD RETURN</span><strong id="market-return">—</strong></div>
+            <div><span class="metric-label">DATA AS OF</span><strong id="market-as-of">—</strong></div>
+            <span class="market-source" id="market-source">—</span>
+          </div>
+          <div class="market-chart-frame" id="market-chart-frame" hidden>
+            <div class="chart-heading"><span>HISTORICAL CLOSE</span><span id="market-chart-count">—</span></div>
+            <canvas id="market-chart" aria-label="Historical market prices" role="img"></canvas>
+          </div>
+          <div class="market-status" id="market-status" aria-live="polite">Load a symbol to fetch current quote and historical OHLCV bars.</div>
+          <form id="backtest-form">
+            <div class="backtest-controls">
+              <label class="field-control data-file-control">
+                <span>PRICE HISTORY <small>OPTIONAL CSV</small></span>
+                <input id="price-file" type="file" accept=".csv,text/csv" />
+              </label>
+              <label class="field-control">
+                <span>MOMENTUM LOOKBACK</span>
+                <input id="lookback" type="number" min="1" max="500" value="40" required />
+              </label>
+              <label class="field-control">
+                <span>VOLATILITY WINDOW</span>
+                <input id="volatility-window" type="number" min="2" max="500" value="20" required />
+              </label>
+              <label class="field-control">
+                <span>TARGET VOLATILITY</span>
+                <input id="target-volatility" type="number" min="0.01" max="5" step="0.01" value="0.15" required />
+              </label>
+              <label class="field-control">
+                <span>MAX LEVERAGE</span>
+                <input id="max-leverage" type="number" min="0.1" max="10" step="0.1" value="1.0" required />
+              </label>
+              <label class="field-control">
+                <span>ONE-WAY COST (BPS)</span>
+                <input id="cost-bps" type="number" min="0" max="1000" step="0.5" value="2" required />
+              </label>
+              <label class="field-control">
+                <span>PERIODS / YEAR</span>
+                <select id="periods-per-year">
+                  <option value="auto" selected>Auto · interval</option>
+                  <option value="252">252 · Trading days</option>
+                  <option value="365">365 · Calendar days</option>
+                </select>
+              </label>
             </div>
-        </div>
-        <div class="card">
-            <h3 style="margin:0 0 10px 0;">T212 Agent (Equities Macro & DCA Specialist)</h3>
-            <div id="t212-ai-box" class="ai-output">Click below to query DeepSeek-R1 at 10.10.10.15...</div>
-            <div style="margin-top:12px;">
-                <button class="btn btn-purple" onclick="runAgent('t212', 'SPY')">Analyze SPY 200 SMA</button>
-                <button class="btn btn-purple" onclick="runAgent('t212', 'VUKE')">Analyze VUKE Dividend DCA</button>
+            <div class="backtest-actions">
+              <p class="csv-hint">Uses loaded bars or CSV (<code>date,close</code>). Signals fill at the next close.</p>
+              <button class="button button-run" id="run-backtest" type="submit"><span aria-hidden="true">▶</span> Run backtest</button>
             </div>
-        </div>
+          </form>
+          <div class="backtest-status" id="backtest-status" aria-live="polite">Ready · synthetic demo prices are used unless a CSV is selected.</div>
+          <div class="backtest-results" id="backtest-results" hidden>
+            <div class="backtest-result-topline">
+              <div><span class="eyebrow">NET PERFORMANCE</span><strong id="result-period">—</strong></div>
+              <span class="result-source" id="result-source">SYNTHETIC SAMPLE</span>
+            </div>
+            <div class="result-metrics">
+              <div class="result-metric"><span>NET RETURN</span><strong id="metric-total-return">—</strong></div>
+              <div class="result-metric"><span>ANNUALIZED</span><strong id="metric-annualized-return">—</strong></div>
+              <div class="result-metric"><span>SHARPE</span><strong id="metric-sharpe">—</strong></div>
+              <div class="result-metric"><span>MAX DRAWDOWN</span><strong id="metric-max-drawdown">—</strong></div>
+              <div class="result-metric"><span>ANN. VOLATILITY</span><strong id="metric-volatility">—</strong></div>
+            </div>
+            <div class="chart-heading"><span>NET EQUITY CURVE</span><span id="result-observations">—</span></div>
+            <div class="chart-frame"><canvas id="equity-chart" aria-label="Backtest net equity curve" role="img"></canvas></div>
+            <p class="chart-disclaimer">Illustrative backtest only. Net of configured turnover costs; historical results do not predict future performance.</p>
+          </div>
+        </section>
+
+        <section class="panel search-panel" aria-labelledby="search-title">
+          <div class="section-heading compact-heading">
+            <div>
+              <div class="eyebrow">INSTRUMENT FINDER <span>·</span> BROKER API</div>
+              <h2 id="search-title">Search Stocks <span class="heading-amp">&amp;</span> ETFs</h2>
+            </div>
+            <span class="catalog-count" id="catalog-count">ON REQUEST</span>
+          </div>
+          <form class="search-form" id="search-form">
+            <label class="sr-only" for="symbol-query">Search by ticker, ISIN, or name</label>
+            <span class="search-icon" aria-hidden="true">⌕</span>
+            <input id="symbol-query" name="query" type="search" autocomplete="off" placeholder="Search by ticker or name (e.g. VUKE, SPY, Apple)" />
+            <button class="button button-primary" id="search-button" type="submit">Search T212 <span aria-hidden="true">→</span></button>
+          </form>
+          <div class="search-results" id="search-results" aria-live="polite" hidden></div>
+          <div class="watchlist" id="watchlist" hidden>
+            <div class="watchlist-heading"><span>WATCHLIST</span><span id="watchlist-count">00 ITEMS</span></div>
+            <div class="watchlist-items" id="watchlist-items"></div>
+          </div>
+        </section>
+
+        <section class="panel agent-panel" aria-labelledby="agent-title">
+          <div class="section-heading compact-heading agent-heading">
+            <div>
+              <div class="eyebrow">RESEARCH ASSISTANT <span>·</span> SERVER-SIDE REQUEST</div>
+              <h2 id="agent-title">T212 Agent <span class="heading-amp">/</span> Equities Macro &amp; DCA</h2>
+            </div>
+            <span class="agent-model"><span class="model-orbit" aria-hidden="true">✳</span> OLLAMA CONFIGURED</span>
+          </div>
+          <form id="agent-form" class="agent-form">
+            <label class="sr-only" for="agent-query">Research question</label>
+            <textarea id="agent-query" rows="2" placeholder="Ask about a symbol, strategy, or portfolio idea..."></textarea>
+            <div class="agent-actions">
+              <div class="prompt-list" aria-label="Example research prompts">
+                <button class="prompt-button" type="button" data-prompt="Analyze the current trend, volatility, and key risks">Analyze market</button>
+                <button class="prompt-button" type="button" data-prompt="Analyze Price Action: identify swing pivots, liquidity sweeps, pinbar rejections, and break of structure">Price Action &amp; Structure</button>
+                <button class="prompt-button" type="button" data-prompt="Optimize settings using a chronological train and validation split">Optimize settings</button>
+              </div>
+              <button class="button button-analyze" type="submit"><span aria-hidden="true">✳</span> Analyze</button>
+            </div>
+          </form>
+          <div class="agent-response" id="agent-response" aria-live="polite" hidden>
+            <span class="response-mark" aria-hidden="true">✳</span>
+            <div class="agent-response-content"><span class="response-label">MARKET RESEARCH</span><p id="agent-response-text"></p><div class="optimization-candidates" id="optimization-candidates"></div></div>
+          </div>
+          <div class="agent-footnote">Agent requests use the existing server-side Ollama endpoint; returned analysis is not a trade instruction.</div>
+        </section>
+      </main>
+
+      <footer class="workspace-footer">
+        <span><span class="footer-mark">MM</span> MONEYMAKINGMACHINE <span class="footer-separator">/</span> RESEARCH TERMINAL</span>
+        <span>READ-ONLY DASHBOARD <span class="footer-separator">·</span> BACKTESTS DO NOT PLACE ORDERS</span>
+      </footer>
     </div>
-
-    <!-- 2. ETORO TAB -->
-    <div id="etoro-tab" class="tab-content" style="display:none;">
-        <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; font-size:1.2rem;">eToro Quant Hub</h2>
-                <button class="btn btn-blue" onclick="fetchEtoroPortfolio()">Refresh eToro</button>
-            </div>
-            <div class="grid" style="margin-top:15px;">
-                <div class="card"><div class="card-label">Credit (Cash)</div><div id="etoro-cash" class="card-val">$0.00</div></div>
-                <div class="card"><div class="card-label">Positions</div><div id="etoro-pos-count" class="card-val">0</div></div>
-                <div class="card"><div class="card-label">Allocated</div><div id="etoro-allocated" class="card-val">$0.00</div></div>
-                <div class="card"><div class="card-label">Unrealized P/L</div><div id="etoro-pnl" class="card-val">$0.00</div></div>
-            </div>
-            <h3>Active Positions & Strategy</h3>
-            <table>
-                <thead><tr><th>Position ID</th><th>Asset</th><th>Strategy</th><th>Type</th><th>Units</th><th>Open Rate</th><th>Amount</th><th>P/L ($)</th></tr></thead>
-                <tbody id="etoro-tbody"><tr><td colspan="8" style="text-align:center; color:var(--muted);">Loading eToro positions...</td></tr></tbody>
-            </table>
-        </div>
-        <div class="card">
-            <h3 style="margin:0;">Search Crypto Pairs (Global / eToro)</h3>
-            <div class="search-container">
-                <input type="text" id="etoro-search-input" class="search-input" placeholder="Search Crypto Asset (e.g. BTC, ETH, SOL, ADA, XRP)..." onkeydown="if(event.key==='Enter') executeEtoroSearch()">
-                <button class="btn btn-blue" onclick="executeEtoroSearch()">Search Crypto</button>
-            </div>
-            <div id="etoro-search-results" class="search-results">
-                <table><thead><tr><th>Symbol</th><th>Price</th><th>24h Change</th><th>Action</th></tr></thead><tbody id="etoro-search-tbody"></tbody></table>
-            </div>
-        </div>
-        <div class="card">
-            <h3 style="margin:0 0 10px 0;">eToro Agent (1H RSI & FVG Specialist)</h3>
-            <div id="etoro-ai-box" class="ai-output">eToro Agent Standby...</div>
-            <div style="margin-top:12px;">
-                <button class="btn btn-purple" onclick="runAgent('etoro', 'ETH')">Analyze ETH 1H Reversion</button>
-                <button class="btn btn-purple" onclick="runAgent('etoro', 'SOL')">Analyze SOL FVG Zone</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 3. BINANCE TAB -->
-    <div id="binance-tab" class="tab-content" style="display:none;">
-        <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; font-size:1.2rem;">Binance Spot Account</h2>
-                <button class="btn btn-blue" onclick="fetchBinancePortfolio()">Refresh Binance</button>
-            </div>
-            <div class="grid" style="margin-top:15px;">
-                <div class="card"><div class="card-label">USDT / Free Cash</div><div id="binance-cash" class="card-val">$0.00</div></div>
-                <div class="card"><div class="card-label">Active Holdings</div><div id="binance-pos-count" class="card-val">0</div></div>
-                <div class="card"><div class="card-label">Total Equity</div><div id="binance-total" class="card-val">$0.00</div></div>
-            </div>
-            <h3>Spot Balances & Assigned Strategy</h3>
-            <table>
-                <thead><tr><th>Asset</th><th>Strategy</th><th>Units</th><th>Estimated Rate</th><th>Status</th></tr></thead>
-                <tbody id="binance-tbody"><tr><td colspan="5" style="text-align:center; color:var(--muted);">Loading Binance balances...</td></tr></tbody>
-            </table>
-        </div>
-        <div class="card">
-            <h3 style="margin:0;">Search Binance Spot Crypto Pairs</h3>
-            <div class="search-container">
-                <input type="text" id="binance-search-input" class="search-input" placeholder="Search Crypto Pair (e.g. BTC, SOL, ETH, PEPE)..." onkeydown="if(event.key==='Enter') executeBinanceSearch()">
-                <button class="btn btn-blue" onclick="executeBinanceSearch()">Search Pairs</button>
-            </div>
-            <div id="binance-search-results" class="search-results">
-                <table><thead><tr><th>Symbol</th><th>Last Price</th><th>24h Change</th><th>Volume</th><th>Action</th></tr></thead><tbody id="binance-search-tbody"></tbody></table>
-            </div>
-        </div>
-        <div class="card">
-            <h3 style="margin:0 0 10px 0;">Binance Agent (5m High-Frequency Order-Flow Specialist)</h3>
-            <div id="binance-ai-box" class="ai-output">Binance Agent Standby...</div>
-            <div style="margin-top:12px;">
-                <button class="btn btn-purple" onclick="runAgent('binance', 'ETHUSDT')">Analyze ETHUSDT 5m</button>
-                <button class="btn btn-purple" onclick="runAgent('binance', 'SOLUSDT')">Analyze SOLUSDT 5m</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 4. KRAKEN TAB -->
-    <div id="kraken-tab" class="tab-content" style="display:none;">
-        <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; font-size:1.2rem;">Kraken Spot Account</h2>
-                <button class="btn btn-blue" onclick="fetchKrakenPortfolio()">Refresh Kraken</button>
-            </div>
-            <div class="grid" style="margin-top:15px;">
-                <div class="card"><div class="card-label">USD / Cash Balance</div><div id="kraken-cash" class="card-val">$0.00</div></div>
-                <div class="card"><div class="card-label">Active Holdings</div><div id="kraken-pos-count" class="card-val">0</div></div>
-            </div>
-            <h3>Kraken Holdings & Assigned Strategy</h3>
-            <table>
-                <thead><tr><th>Asset</th><th>Strategy</th><th>Units</th><th>Status</th></tr></thead>
-                <tbody id="kraken-tbody"><tr><td colspan="4" style="text-align:center; color:var(--muted);">Loading Kraken balances...</td></tr></tbody>
-            </table>
-        </div>
-        <div class="card">
-            <h3 style="margin:0;">Search Kraken Spot Pairs</h3>
-            <div class="search-container">
-                <input type="text" id="kraken-search-input" class="search-input" placeholder="Search Kraken Pair (e.g. ETH, USD, EUR, XBT)..." onkeydown="if(event.key==='Enter') executeKrakenSearch()">
-                <button class="btn btn-blue" onclick="executeKrakenSearch()">Search Kraken</button>
-            </div>
-            <div id="kraken-search-results" class="search-results">
-                <table><thead><tr><th>Pair Name</th><th>Base</th><th>Quote</th><th>Status</th><th>Action</th></tr></thead><tbody id="kraken-search-tbody"></tbody></table>
-            </div>
-        </div>
-        <div class="card">
-            <h3 style="margin:0 0 10px 0;">Kraken Agent (Multi-Currency Swing Specialist)</h3>
-            <div id="kraken-ai-box" class="ai-output">Kraken Agent Standby...</div>
-            <div style="margin-top:12px;">
-                <button class="btn btn-purple" onclick="runAgent('kraken', 'ETHUSD')">Analyze ETHUSD Swing</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 5. QUANTAI TAB -->
-    <div id="quantai-tab" class="tab-content" style="display:none;">
-        <div class="card">
-            <h2 style="margin:0 0 10px 0; font-size:1.2rem;">QuantAI Multi-Agent Reasoner</h2>
-            <div id="quantai-ai-box" class="ai-output">QuantAI System Online. Connected to DeepSeek-R1 at 10.10.10.15:11434 across vmbr1.</div>
-            <div style="margin-top:12px;">
-                <button class="btn btn-purple" onclick="runAgent('quantai', 'PORTFOLIO')">Run Cross-Broker Portfolio Synthesis</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    function switchTab(tabId, btnEl) {
-        document.querySelectorAll('.tab-content').forEach(function(c) { c.style.display = 'none'; });
-        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-        document.getElementById(tabId).style.display = 'block';
-        if (btnEl) btnEl.classList.add('active');
-    }
-
-    function triggerFromBtn(btn) {
-        runAgent(btn.getAttribute('data-broker'), btn.getAttribute('data-symbol'));
-    }
-
-    async function fetchT212Portfolio() {
-        try {
-            const r = await fetch('/api/t212/portfolio');
-            const d = await r.json();
-            document.getElementById('t212-cash').innerText = '$' + (d.cash || 0).toFixed(2);
-            document.getElementById('t212-pos-count').innerText = d.active_positions || 0;
-            document.getElementById('t212-invested').innerText = '$' + (d.total_invested || 0).toFixed(2);
-            document.getElementById('t212-pnl').innerText = (d.unrealized_pnl >= 0 ? '+' : '') + '$' + (d.unrealized_pnl || 0).toFixed(2);
-            document.getElementById('t212-equity').innerText = '$' + (d.total_equity || 0).toFixed(2);
-            const tbody = document.getElementById('t212-tbody');
-            tbody.innerHTML = '';
-            if (!d.positions || d.positions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--muted);">No active positions.</td></tr>';
-                return;
-            }
-            d.positions.forEach(function(p) {
-                const strat = p.strategy || "200-Day SMA Macro";
-                const col = p.ppl >= 0 ? 'var(--green)' : 'var(--red)';
-                const sign = p.ppl >= 0 ? '+' : '';
-                let row = '<tr>';
-                row += '<td><strong>' + p.ticker + '</strong></td>';
-                row += '<td><span class="badge badge-strat">' + strat + '</span></td>';
-                row += '<td>' + (p.units || 0).toFixed(4) + '</td>';
-                row += '<td>$' + (p.open_price || 0).toFixed(2) + '</td>';
-                row += '<td>$' + (p.invested || 0).toFixed(2) + '</td>';
-                row += '<td style="color:' + col + '">' + sign + '$' + (p.ppl || 0).toFixed(2) + '</td>';
-                row += '<td><span class="badge" style="color:' + col + '">' + p.ppl_pct + '%</span></td>';
-                row += '<td><span class="badge" style="color:var(--green)">' + p.status + '</span></td>';
-                row += '</tr>';
-                tbody.innerHTML += row;
-            });
-        } catch(e) {}
-    }
-
-    async function fetchEtoroPortfolio() {
-        try {
-            const r = await fetch('/api/etoro/portfolio');
-            const d = await r.json();
-            document.getElementById('etoro-cash').innerText = '$' + (d.credit || 0).toFixed(2);
-            document.getElementById('etoro-pos-count').innerText = (d.positions || []).length;
-            document.getElementById('etoro-allocated').innerText = '$' + (d.allocated || 0).toFixed(2);
-            document.getElementById('etoro-pnl').innerText = (d.unrealized_pnl >= 0 ? '+' : '') + '$' + (d.unrealized_pnl || 0).toFixed(2);
-            const tbody = document.getElementById('etoro-tbody');
-            tbody.innerHTML = '';
-            if (!d.positions || d.positions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--muted);">No active positions.</td></tr>';
-                return;
-            }
-            d.positions.forEach(function(p) {
-                const col = p.netProfit >= 0 ? 'var(--green)' : 'var(--red)';
-                let row = '<tr>';
-                row += '<td>' + p.positionID + '</td>';
-                row += '<td><strong>' + p.symbol + '</strong></td>';
-                row += '<td><span class="badge badge-strat">' + p.strategy + '</span></td>';
-                row += '<td>' + (p.isBuy ? 'BUY' : 'SELL') + '</td>';
-                row += '<td>' + p.units + '</td>';
-                row += '<td>$' + (p.openRate || 0).toFixed(2) + '</td>';
-                row += '<td>$' + (p.amount || 0).toFixed(2) + '</td>';
-                row += '<td style="color:' + col + '">$' + (p.netProfit || 0).toFixed(2) + '</td>';
-                row += '</tr>';
-                tbody.innerHTML += row;
-            });
-        } catch(e) {}
-    }
-
-    async function fetchBinancePortfolio() {
-        try {
-            const r = await fetch('/api/binance/portfolio');
-            const d = await r.json();
-            document.getElementById('binance-cash').innerText = '$' + (d.cash || 0).toFixed(2);
-            document.getElementById('binance-pos-count').innerText = d.active_positions || 0;
-            document.getElementById('binance-total').innerText = '$' + (d.total_equity || 0).toFixed(2);
-            const tbody = document.getElementById('binance-tbody');
-            tbody.innerHTML = '';
-            if (!d.positions || d.positions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--muted);">No balances held.</td></tr>';
-                return;
-            }
-            d.positions.forEach(function(p) {
-                let row = '<tr><td><strong>' + p.ticker + '</strong></td><td><span class="badge badge-strat">5m Kline Momentum</span></td><td>' + p.units + '</td><td>$' + (p.open_price || 0).toFixed(2) + '</td><td><span class="badge" style="color:var(--green)">' + p.status + '</span></td></tr>';
-                tbody.innerHTML += row;
-            });
-        } catch(e) {}
-    }
-
-    async function fetchKrakenPortfolio() {
-        try {
-            const r = await fetch('/api/kraken/portfolio');
-            const d = await r.json();
-            document.getElementById('kraken-cash').innerText = '$' + (d.cash || 0).toFixed(2);
-            document.getElementById('kraken-pos-count').innerText = d.active_positions || 0;
-            const tbody = document.getElementById('kraken-tbody');
-            tbody.innerHTML = '';
-            if (!d.positions || d.positions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--muted);">No balances held.</td></tr>';
-                return;
-            }
-            d.positions.forEach(function(p) {
-                let row = '<tr><td><strong>' + p.ticker + '</strong></td><td><span class="badge badge-strat">' + p.strategy + '</span></td><td>' + p.units + '</td><td><span class="badge" style="color:var(--green)">' + p.status + '</span></td></tr>';
-                tbody.innerHTML += row;
-            });
-        } catch(e) {}
-    }
-
-    async function runAgent(broker, sym) {
-        const box = document.getElementById(broker + '-ai-box');
-        if (box) box.innerText = '[' + broker.toUpperCase() + ' AGENT] Querying DeepSeek-R1 at 10.10.10.15 for ' + sym + '...';
-        try {
-            const r = await fetch('/api/agent/query?broker=' + encodeURIComponent(broker) + '&symbol=' + encodeURIComponent(sym));
-            const d = await r.json();
-            if (box) box.innerText = d.analysis || d.error;
-        } catch(e) {
-            if (box) box.innerText = 'Error: ' + e.message;
-        }
-    }
-
-    async function executeT212Search() {
-        const q = document.getElementById('t212-search-input').value.trim();
-        if (!q) return;
-        const box = document.getElementById('t212-search-results');
-        const tbody = document.getElementById('t212-search-tbody');
-        box.style.display = 'block';
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Searching...</td></tr>';
-        const r = await fetch('/api/search/t212?q=' + encodeURIComponent(q));
-        const data = await r.json();
-        tbody.innerHTML = '';
-        if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--muted);">No instruments found.</td></tr>'; return; }
-        data.forEach(function(item) {
-            tbody.innerHTML += '<tr><td><strong>' + item.ticker + '</strong></td><td>' + item.name + '</td><td>' + item.type + '</td><td>' + item.currency + '</td><td><button class="btn btn-purple" data-broker="t212" data-symbol="' + item.ticker + '" onclick="triggerFromBtn(this)">AI Analyze</button></td></tr>';
-        });
-    }
-
-    async function executeEtoroSearch() {
-        const q = document.getElementById('etoro-search-input').value.trim();
-        if (!q) return;
-        const box = document.getElementById('etoro-search-results');
-        const tbody = document.getElementById('etoro-search-tbody');
-        box.style.display = 'block';
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Searching crypto feeds...</td></tr>';
-        const r = await fetch('/api/search/binance?q=' + encodeURIComponent(q));
-        const data = await r.json();
-        tbody.innerHTML = '';
-        if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--muted);">No pairs found.</td></tr>'; return; }
-        data.forEach(function(item) {
-            tbody.innerHTML += '<tr><td><strong>' + item.symbol + '</strong></td><td>$' + item.price.toFixed(4) + '</td><td>' + item.change.toFixed(2) + '%</td><td><button class="btn btn-purple" data-broker="etoro" data-symbol="' + item.symbol + '" onclick="triggerFromBtn(this)">AI Check</button></td></tr>';
-        });
-    }
-
-    async function executeBinanceSearch() {
-        const q = document.getElementById('binance-search-input').value.trim();
-        if (!q) return;
-        const box = document.getElementById('binance-search-results');
-        const tbody = document.getElementById('binance-search-tbody');
-        box.style.display = 'block';
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Scanning Binance...</td></tr>';
-        const r = await fetch('/api/search/binance?q=' + encodeURIComponent(q));
-        const data = await r.json();
-        tbody.innerHTML = '';
-        if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--muted);">No pairs found.</td></tr>'; return; }
-        data.forEach(function(item) {
-            tbody.innerHTML += '<tr><td><strong>' + item.symbol + '</strong></td><td>$' + item.price.toFixed(4) + '</td><td>' + item.change.toFixed(2) + '%</td><td>' + item.volume.toFixed(0) + '</td><td><button class="btn btn-purple" data-broker="binance" data-symbol="' + item.symbol + '" onclick="triggerFromBtn(this)">AI Check</button></td></tr>';
-        });
-    }
-
-    async function executeKrakenSearch() {
-        const q = document.getElementById('kraken-search-input').value.trim();
-        if (!q) return;
-        const box = document.getElementById('kraken-search-results');
-        const tbody = document.getElementById('kraken-search-tbody');
-        box.style.display = 'block';
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Querying Kraken...</td></tr>';
-        const r = await fetch('/api/search/kraken?q=' + encodeURIComponent(q));
-        const data = await r.json();
-        tbody.innerHTML = '';
-        if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--muted);">No pairs found.</td></tr>'; return; }
-        data.forEach(function(item) {
-            const pName = item.display || item.pair;
-            tbody.innerHTML += '<tr><td><strong>' + pName + '</strong></td><td>' + item.base + '</td><td>' + item.quote + '</td><td>' + item.status + '</td><td><button class="btn btn-purple" data-broker="kraken" data-symbol="' + pName + '" onclick="triggerFromBtn(this)">AI Analyze</button></td></tr>';
-        });
-    }
-
-    fetchT212Portfolio();
-    fetchEtoroPortfolio();
-    fetchBinancePortfolio();
-    fetchKrakenPortfolio();
-</script>
-</body>
+    <script src="dashboard.js"></script>
+  </body>
 </html>
