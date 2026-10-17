@@ -207,21 +207,52 @@ def analyze_market_route():
         "If asked to optimize, suggest parameter candidates and say they must be backtested out of sample; do not claim to have optimized unless results are supplied. "
         f"User question: {question}\nMarket context JSON: {json.dumps(context, separators=(',', ':'))}"
     )
-    ollama_url = os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434").rstrip("/")
+    from core.state_store import StateStore
+    store = StateStore()
+    stored_url = store.get_setting("orchestrator_url", "")
+    stored_model = store.get_setting("orchestrator_model", "")
+
+    ollama_url = (stored_url or os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")).rstrip("/")
+    model_name = stored_model or os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+
     try:
         response = requests.post(
             f"{ollama_url}/api/generate",
-            json={"model": os.getenv("OLLAMA_MODEL", "deepseek-r1:7b"), "prompt": prompt, "stream": False},
+            json={"model": model_name, "prompt": prompt, "stream": False},
             timeout=45,
         )
+        if getattr(response, "status_code", 200) == 404:
+            # Model not found on Ollama, try finding an available model from tags
+            try:
+                tags_resp = requests.get(f"{ollama_url}/api/tags", timeout=5)
+                if tags_resp.status_code == 200:
+                    tags_data = tags_resp.json()
+                    avail_models = [m.get("name") for m in tags_data.get("models", [])]
+                    if avail_models:
+                        model_name = avail_models[0]
+                        response = requests.post(
+                            f"{ollama_url}/api/generate",
+                            json={"model": model_name, "prompt": prompt, "stream": False},
+                            timeout=45,
+                        )
+            except Exception:
+                pass
         response.raise_for_status()
         analysis = response.json().get("response", "")
         if not analysis:
             return jsonify({"error": "The analysis model returned an empty response"}), 502
-    except requests.RequestException:
-        return jsonify({"error": "Analysis model is unavailable"}), 502
-    except (ValueError, AttributeError):
-        return jsonify({"error": "Analysis model returned an invalid response"}), 502
+    except requests.RequestException as e:
+        err_msg = str(e)
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                err_json = e.response.json()
+                if "error" in err_json:
+                    err_msg = err_json["error"]
+            except Exception:
+                err_msg = e.response.text or str(e)
+        return jsonify({"error": f"Analysis model is unavailable: {err_msg}"}), 502
+    except (ValueError, AttributeError) as e:
+        return jsonify({"error": f"Analysis model returned an invalid response: {str(e)}"}), 502
 
     return jsonify({
         "analysis": analysis,
