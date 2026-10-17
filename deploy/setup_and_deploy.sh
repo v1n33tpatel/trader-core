@@ -18,23 +18,34 @@ CONFIG_DIR="/etc/trader-core"
 echo "[1/5] Ensuring persistent host directories..."
 if [ "$(id -u)" -eq 0 ]; then
     mkdir -p "${DATA_DIR}" "${CONFIG_DIR}"
-    if [ -f "${PROJECT_ROOT}/.env" ] && [ ! -f "${CONFIG_DIR}/.env" ]; then
-        cp "${PROJECT_ROOT}/.env" "${CONFIG_DIR}/.env"
+    if [ -f "${PROJECT_ROOT}/.env" ]; then
+        cp -f "${PROJECT_ROOT}/.env" "${CONFIG_DIR}/.env"
         chmod 600 "${CONFIG_DIR}/.env"
-        echo "   ✓ Copied .env to ${CONFIG_DIR}/.env"
+        echo "   ✓ Synced .env to ${CONFIG_DIR}/.env"
     fi
 else
     echo "   Note: Non-root execution. Ensuring local data dir fallback..."
     mkdir -p "${PROJECT_ROOT}/data"
 fi
 
+# Load environment variables (such as OPEN_WEBUI_API_KEY)
+if [ -f "${CONFIG_DIR}/.env" ]; then
+    set -a
+    . "${CONFIG_DIR}/.env"
+    set +a
+elif [ -f "${PROJECT_ROOT}/.env" ]; then
+    set -a
+    . "${PROJECT_ROOT}/.env"
+    set +a
+fi
+
 # 2. Build Container Image
 echo "[2/5] Building Podman container image (localhost/trader-core:latest)..."
 if command -v podman >/dev/null 2>&1; then
-    if podman build -t localhost/trader-core:latest -f "${PROJECT_ROOT}/Containerfile" "${PROJECT_ROOT}" 2>/dev/null; then
+    if podman build --network=host -t localhost/trader-core:latest -f "${PROJECT_ROOT}/Containerfile" "${PROJECT_ROOT}"; then
         echo "   ✓ Image built successfully."
     else
-        echo "   ⚠ Podman build requires host root/cgroup privileges. Run directly on host: podman build -t localhost/trader-core:latest ."
+        echo "   ⚠ Podman build failed. Review output above."
     fi
 else
     echo "   ⚠ Podman binary not found in PATH. Skipping container build."
