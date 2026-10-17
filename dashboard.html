@@ -11,7 +11,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="dashboard.css?v=2.2.0" />
+    <link rel="stylesheet" href="dashboard.css?v=2.3.0" />
   </head>
   <body>
     <div class="workspace">
@@ -42,6 +42,15 @@
             <span class="auto-mode-label" id="auto-mode-label">REACTIVE</span>
             <span class="auto-state-label" id="auto-state-label">PAUSED</span>
           </div>
+
+          <button type="button" class="copilot-quick-pill" id="btn-topbar-copilot" title="Launch Quant Copilot AI Chatbot">
+            <span class="copilot-pill-icon">🤖</span>
+            <span class="copilot-pill-text">AI COPILOT</span>
+          </button>
+          <button type="button" class="workflow-quick-pill" id="btn-topbar-workflow" title="Scroll to 8-Step Trade Workflow">
+            <span class="copilot-pill-icon">⚡</span>
+            <span class="copilot-pill-text">8-STEP WORKFLOW</span>
+          </button>
         </div>
 
         <div class="inference-state">
@@ -729,8 +738,8 @@
             <button class="button button-primary" id="search-button" type="submit">Search T212 <span aria-hidden="true">→</span></button>
           </form>
           <div class="search-results" id="search-results" aria-live="polite" hidden></div>
-          <div class="watchlist" id="watchlist" hidden>
-            <div class="watchlist-heading"><span>WATCHLIST</span><span id="watchlist-count">00 ITEMS</span></div>
+          <div class="watchlist" id="watchlist">
+            <div class="watchlist-heading"><span id="watchlist-heading-title">STOCKS &amp; ETFS WATCHLIST</span><span id="watchlist-count">00 ITEMS</span></div>
             <div class="watchlist-items" id="watchlist-items"></div>
           </div>
         </section>
@@ -1667,6 +1676,6 @@
       </div>
     </div>
 
-    <script src="dashboard.js?v=2.2.0"></script>
+    <script src="dashboard.js?v=2.3.0"></script>
   </body>
 </html>

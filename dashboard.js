@@ -24,7 +24,75 @@ const agentForm = document.querySelector("#agent-form");
 const agentQuery = document.querySelector("#agent-query");
 const agentResponse = document.querySelector("#agent-response");
 const agentResponseText = document.querySelector("#agent-response-text");
-const watchlistSymbols = new Map();
+const BROKER_WATCHLIST_DEFAULTS = {
+  t212: [
+    { symbol: "AAPL", name: "Apple Inc.", type: "STOCK", sentiment: "+0.45", bias: "BULLISH" },
+    { symbol: "NVDA", name: "NVIDIA Corp.", type: "STOCK", sentiment: "+0.65", bias: "BULLISH" },
+    { symbol: "MSFT", name: "Microsoft Corp.", type: "STOCK", sentiment: "+0.32", bias: "BULLISH" },
+    { symbol: "SPY", name: "SPDR S&P 500 ETF", type: "ETF", sentiment: "+0.35", bias: "BULLISH" },
+    { symbol: "QQQ", name: "Invesco QQQ Trust", type: "ETF", sentiment: "+0.40", bias: "BULLISH" },
+    { symbol: "VUKE", name: "Vanguard FTSE 100 ETF", type: "ETF", sentiment: "+0.15", bias: "NEUTRAL" },
+    { symbol: "VUSA", name: "Vanguard S&P 500 ETF", type: "ETF", sentiment: "+0.38", bias: "BULLISH" },
+  ],
+  binance: [
+    { symbol: "BTCUSDT", name: "Bitcoin / USDT", type: "CRYPTO", sentiment: "+0.55", bias: "BULLISH" },
+    { symbol: "ETHUSDT", name: "Ethereum / USDT", type: "CRYPTO", sentiment: "+0.35", bias: "BULLISH" },
+    { symbol: "SOLUSDT", name: "Solana / USDT", type: "CRYPTO", sentiment: "+0.48", bias: "BULLISH" },
+    { symbol: "BNBUSDT", name: "BNB / USDT", type: "CRYPTO", sentiment: "+0.20", bias: "NEUTRAL" },
+    { symbol: "DOGEUSDT", name: "Dogecoin / USDT", type: "CRYPTO", sentiment: "-0.10", bias: "NEUTRAL" },
+    { symbol: "AVAXUSDT", name: "Avalanche / USDT", type: "CRYPTO", sentiment: "+0.25", bias: "BULLISH" },
+  ],
+  ctrader: [
+    { symbol: "EURUSD", name: "Euro / US Dollar", type: "FOREX", sentiment: "+0.18", bias: "BULLISH" },
+    { symbol: "GBPUSD", name: "British Pound / USD", type: "FOREX", sentiment: "+0.22", bias: "BULLISH" },
+    { symbol: "USDJPY", name: "US Dollar / Japanese Yen", type: "FOREX", sentiment: "-0.25", bias: "BEARISH" },
+    { symbol: "AUDUSD", name: "Australian Dollar / USD", type: "FOREX", sentiment: "+0.10", bias: "NEUTRAL" },
+    { symbol: "XAUUSD", name: "Gold / US Dollar", type: "COMMODITY", sentiment: "+0.60", bias: "BULLISH" },
+    { symbol: "USOIL", name: "WTI Crude Oil", type: "COMMODITY", sentiment: "+0.05", bias: "NEUTRAL" },
+  ],
+  etoro: [
+    { symbol: "ETH", name: "Ethereum", type: "CRYPTO", sentiment: "+0.35", bias: "BULLISH" },
+    { symbol: "BTC", name: "Bitcoin", type: "CRYPTO", sentiment: "+0.55", bias: "BULLISH" },
+    { symbol: "SPY", name: "S&P 500 ETF", type: "ETF", sentiment: "+0.35", bias: "BULLISH" },
+  ],
+  kraken: [
+    { symbol: "BTCUSD", name: "Bitcoin / USD", type: "CRYPTO", sentiment: "+0.55", bias: "BULLISH" },
+    { symbol: "ETHUSD", name: "Ethereum / USD", type: "CRYPTO", sentiment: "+0.35", bias: "BULLISH" },
+    { symbol: "SOLUSD", name: "Solana / USD", type: "CRYPTO", sentiment: "+0.48", bias: "BULLISH" },
+  ],
+};
+
+function getBrokerWatchlist(broker) {
+  try {
+    const raw = localStorage.getItem(`mmm_watchlist_${broker}`);
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return BROKER_WATCHLIST_DEFAULTS[broker] || BROKER_WATCHLIST_DEFAULTS.t212;
+}
+
+function saveBrokerWatchlist(broker, items) {
+  try {
+    localStorage.setItem(`mmm_watchlist_${broker}`, JSON.stringify(items));
+  } catch (_) {}
+}
+
+function addToBrokerWatchlist(broker, item) {
+  const list = getBrokerWatchlist(broker);
+  if (!list.some((x) => x.symbol === item.symbol)) {
+    list.unshift(item);
+    saveBrokerWatchlist(broker, list);
+  }
+}
+
+function removeFromBrokerWatchlist(broker, symbol) {
+  const list = getBrokerWatchlist(broker).filter((x) => x.symbol !== symbol);
+  saveBrokerWatchlist(broker, list);
+}
+
+function isSymbolInBrokerWatchlist(broker, symbol) {
+  return getBrokerWatchlist(broker).some((x) => x.symbol === symbol);
+}
+
 const brokerSearchPaths = {
   t212: "/api/search/t212",
   etoro: "/api/search/binance",
@@ -147,12 +215,28 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
     const broker = brokerNames[currentBroker];
     portfolioTitle.textContent = `${broker} Portfolio`;
     document.querySelector(".button-refresh span:last-child").textContent = `Refresh ${broker.split(" ")[0]}`;
-    document.querySelector("#search-title").textContent = currentBroker === "t212"
-      ? "Search Stocks & ETFs"
-      : currentBroker === "quantai" ? "Instrument Search" : `Search ${broker} Instruments`;
-    document.querySelector("#search-button").innerHTML = `Search ${broker.split(" ")[0]} <span aria-hidden="true">→</span>`;
+    // Tailored Search Headings & Placeholders
+    if (currentBroker === "t212") {
+      document.querySelector("#search-title").innerHTML = "Search Stocks <span class='heading-amp'>&amp;</span> ETFs · Equities";
+      searchInput.placeholder = "Search stocks & ETFs (e.g. VUKE, VUSA, AAPL, NVDA, SPY, Apple)...";
+      document.querySelector("#search-button").innerHTML = "Search T212 Stocks <span aria-hidden='true'>→</span>";
+    } else if (currentBroker === "binance") {
+      document.querySelector("#search-title").innerHTML = "Search Crypto Assets · Binance Spot &amp; Alts";
+      searchInput.placeholder = "Search crypto pairs (e.g. BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT)...";
+      document.querySelector("#search-button").innerHTML = "Search Binance Crypto <span aria-hidden='true'>→</span>";
+    } else if (currentBroker === "ctrader") {
+      document.querySelector("#search-title").innerHTML = "Search Forex Pairs <span class='heading-amp'>&amp;</span> Commodities";
+      searchInput.placeholder = "Search currency pairs & metals (e.g. EURUSD, GBPUSD, USDJPY, XAUUSD)...";
+      document.querySelector("#search-button").innerHTML = "Search cTrader Forex <span aria-hidden='true'>→</span>";
+    } else {
+      document.querySelector("#search-title").textContent = `Search ${broker} Instruments`;
+      searchInput.placeholder = "Search by ticker or name...";
+      document.querySelector("#search-button").innerHTML = `Search ${broker.split(" ")[0]} <span aria-hidden="true">→</span>`;
+    }
+
     document.querySelector("#agent-title").textContent = `${broker} Research Agent`;
     searchResults.hidden = true;
+    renderWatchlist();
     if (typeof renderWorkflowChips === "function") renderWorkflowChips(currentBroker);
     loadPortfolio(currentBroker);
   });
@@ -308,17 +392,47 @@ async function renderSearch(query) {
     type.className = "result-type";
     type.textContent = item.type || item.currency || item.quote || (item.price ? money(item.price) : "INSTRUMENT");
 
-    const addButton = document.createElement("button");
-    addButton.type = "button";
-    addButton.className = "watchlist-add";
-    addButton.textContent = watchlistSymbols.has(tickerValue) ? "Added" : "Analyze";
-    addButton.disabled = watchlistSymbols.has(tickerValue);
-    addButton.addEventListener("click", () => {
-      agentQuery.value = tickerValue;
-      agentForm.requestSubmit();
+    const actions = document.createElement("div");
+    actions.className = "result-actions";
+
+    // 1. Add to Watchlist Button
+    const inWatchlist = isSymbolInBrokerWatchlist(currentBroker, tickerValue);
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "btn-add-watchlist";
+    addBtn.textContent = inWatchlist ? "✓ Added" : "+ Watchlist";
+    addBtn.disabled = inWatchlist;
+    addBtn.addEventListener("click", () => {
+      let inferredType = "STOCK";
+      if (currentBroker === "binance" || currentBroker === "kraken") inferredType = "CRYPTO";
+      else if (currentBroker === "ctrader") inferredType = tickerValue.includes("XAU") ? "COMMODITY" : "FOREX";
+      else if (tickerValue.includes("ETF") || ["SPY", "QQQ", "VUKE", "VUSA"].includes(tickerValue)) inferredType = "ETF";
+
+      addToBrokerWatchlist(currentBroker, {
+        symbol: tickerValue,
+        name: nameValue,
+        type: item.type || inferredType,
+        sentiment: "+0.35",
+        bias: "BULLISH",
+      });
+      addBtn.textContent = "✓ Added";
+      addBtn.disabled = true;
+      renderWatchlist();
     });
 
-    row.append(ticker, name, type, addButton);
+    // 2. Step Into 8-Step Workflow Button
+    const wfBtn = document.createElement("button");
+    wfBtn.type = "button";
+    wfBtn.className = "btn-step-workflow";
+    wfBtn.innerHTML = "<span>⚡ Step into Workflow</span>";
+    wfBtn.title = `Launch 8-Step Quantitative Pipeline for ${tickerValue}`;
+    wfBtn.addEventListener("click", () => {
+      loadWorkflowRecommendation(tickerValue);
+      document.querySelector("#trade-workflow-card")?.scrollIntoView({ behavior: "smooth" });
+    });
+
+    actions.append(addBtn, wfBtn);
+    row.append(ticker, name, type, actions);
     searchResults.append(row);
   });
 }
@@ -331,34 +445,89 @@ function renderSearchMessage(message) {
 }
 
 function renderWatchlist() {
+  if (!watchlistItems) return;
   watchlistItems.replaceChildren();
-  watchlist.hidden = watchlistSymbols.size === 0;
-  watchlistCount.textContent = `${String(watchlistSymbols.size).padStart(2, "0")} ${watchlistSymbols.size === 1 ? "ITEM" : "ITEMS"}`;
 
-  watchlistSymbols.forEach((item, ticker) => {
+  const titleEl = document.querySelector("#watchlist-heading-title");
+  if (titleEl) {
+    if (currentBroker === "t212") titleEl.textContent = "STOCKS & ETFS WATCHLIST";
+    else if (currentBroker === "binance") titleEl.textContent = "CRYPTO ASSETS WATCHLIST";
+    else if (currentBroker === "ctrader") titleEl.textContent = "FOREX & COMMODITIES WATCHLIST";
+    else if (currentBroker === "kraken") titleEl.textContent = "KRAKEN CRYPTO WATCHLIST";
+    else titleEl.textContent = `${(brokerNames[currentBroker] || "BROKER").toUpperCase()} WATCHLIST`;
+  }
+
+  const items = getBrokerWatchlist(currentBroker);
+  if (watchlist) watchlist.hidden = false;
+  if (watchlistCount) {
+    watchlistCount.textContent = `${String(items.length).padStart(2, "0")} ${items.length === 1 ? "ITEM" : "ITEMS"}`;
+  }
+
+  if (!items.length) {
+    const emptyP = document.createElement("p");
+    emptyP.className = "search-empty";
+    emptyP.textContent = "Your watchlist is empty. Search instruments above and click '+ Watchlist' to pin them.";
+    watchlistItems.append(emptyP);
+    return;
+  }
+
+  items.forEach((item) => {
     const entry = document.createElement("div");
     entry.className = "watchlist-item";
 
-    const symbol = document.createElement("span");
-    symbol.className = "watchlist-symbol";
-    symbol.textContent = ticker;
+    const symbolSpan = document.createElement("span");
+    symbolSpan.className = "watchlist-symbol";
+    symbolSpan.textContent = item.symbol;
 
-    const name = document.createElement("span");
-    name.className = "watchlist-name";
-    name.textContent = item.name;
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "watchlist-name";
+    nameSpan.textContent = `${item.name} · ${item.type || "ASSET"}`;
 
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "watchlist-remove";
-    remove.setAttribute("aria-label", `Remove ${ticker} from watchlist`);
-    remove.textContent = "×";
-    remove.addEventListener("click", () => {
-      watchlistSymbols.delete(ticker);
+    const sentPill = document.createElement("span");
+    const isBull = (item.sentiment || "").startsWith("+") || item.bias === "BULLISH";
+    sentPill.className = `badge ${isBull ? "badge-strat" : "badge-bear"}`;
+    sentPill.textContent = `${item.sentiment || "+0.35"} ${item.bias || "BULL"}`;
+
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "watchlist-row-actions";
+
+    // 1-Click Workflow Button
+    const btnWf = document.createElement("button");
+    btnWf.type = "button";
+    btnWf.className = "btn-step-workflow-mini";
+    btnWf.innerHTML = "<span>⚡ Workflow</span>";
+    btnWf.title = `Step ${item.symbol} into the 8-Step Quantitative Pipeline`;
+    btnWf.addEventListener("click", () => {
+      loadWorkflowRecommendation(item.symbol);
+      document.querySelector("#trade-workflow-card")?.scrollIntoView({ behavior: "smooth" });
+    });
+
+    // Analyze Button
+    const btnAnalyze = document.createElement("button");
+    btnAnalyze.type = "button";
+    btnAnalyze.className = "watchlist-analyze";
+    btnAnalyze.textContent = "Analyze";
+    btnAnalyze.title = `Analyze ${item.symbol} with AI Research Agent`;
+    btnAnalyze.addEventListener("click", () => {
+      agentQuery.value = item.symbol;
+      agentForm.requestSubmit();
+      document.querySelector("#agent-response")?.scrollIntoView({ behavior: "smooth" });
+    });
+
+    // Remove Button
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "watchlist-remove";
+    removeBtn.setAttribute("aria-label", `Remove ${item.symbol} from watchlist`);
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => {
+      removeFromBrokerWatchlist(currentBroker, item.symbol);
       renderWatchlist();
       if (!searchResults.hidden && searchInput.value.trim()) renderSearch(searchInput.value.trim());
     });
 
-    entry.append(symbol, name, remove);
+    actionsDiv.append(btnWf, btnAnalyze, removeBtn);
+    entry.append(symbolSpan, nameSpan, sentPill, actionsDiv);
     watchlistItems.append(entry);
   });
 }
@@ -1025,6 +1194,7 @@ if (syncEquityBtn) {
       }
     }
   });
+}
 updateKellyCalculator();
 
 /* =========================================================================
@@ -2230,6 +2400,19 @@ async function loadWorkflowRecommendation(symbol) {
 function initWorkflowController() {
   renderWorkflowChips(currentBroker);
 
+  // Topbar 8-Step Workflow Button
+  const topbarWorkflowBtn = document.querySelector("#btn-topbar-workflow");
+  if (topbarWorkflowBtn) {
+    topbarWorkflowBtn.addEventListener("click", () => {
+      const card = document.querySelector("#trade-workflow-card");
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "start" });
+        card.classList.add("highlight-pulse");
+        setTimeout(() => card.classList.remove("highlight-pulse"), 1500);
+      }
+    });
+  }
+
   // Stepper Node Click
   document.querySelectorAll(".wf-step-node").forEach((node) => {
     node.addEventListener("click", () => {
@@ -2374,6 +2557,7 @@ function initWorkflowController() {
 
 function initQuantCopilot() {
   const toggleBtn = document.querySelector("#btn-copilot-toggle");
+  const topbarCopilotBtn = document.querySelector("#btn-topbar-copilot");
   const copilotWin = document.querySelector("#copilot-window");
   const closeBtn = document.querySelector("#btn-copilot-close");
   const clearBtn = document.querySelector("#btn-copilot-clear");
@@ -2383,12 +2567,20 @@ function initQuantCopilot() {
   const input = document.querySelector("#copilot-input");
   const messagesBox = document.querySelector("#copilot-messages");
 
-  if (!toggleBtn || !copilotWin) return;
+  if (!copilotWin) return;
 
-  toggleBtn.addEventListener("click", () => {
+  const toggleCopilot = () => {
     copilotWin.hidden = !copilotWin.hidden;
     if (!copilotWin.hidden && input) input.focus();
-  });
+  };
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", toggleCopilot);
+  }
+
+  if (topbarCopilotBtn) {
+    topbarCopilotBtn.addEventListener("click", toggleCopilot);
+  }
 
   if (closeBtn) {
     closeBtn.addEventListener("click", () => {
@@ -2611,3 +2803,4 @@ function initAdminControls() {
 initWorkflowController();
 initQuantCopilot();
 initAdminControls();
+renderWatchlist();
