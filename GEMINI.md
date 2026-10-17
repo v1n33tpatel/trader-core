@@ -138,6 +138,10 @@ trader-core/
    * **Order Sign Invariant**: Buy orders require positive quantity (`quantity > 0`); sell orders **must** use negative quantity (`quantity < 0`, e.g. `-10.0`).
    * **Non-Idempotent Market Orders**: Market orders cannot be safely retried upon timeout; check `/equity/orders` or order history before re-submitting.
    * **Ticker Normalization**: Strip exchange suffixes (`_US_EQ`, `_EQ`, `l_EQ`, `.L`) for clean UI display, but retain the raw ticker for API order requests.
+   * **PRIIPs Regulation & UCITS Mandate**: In Invest and ISA accounts, retail investors cannot purchase direct US-domiciled ETFs (e.g. `QQQ`, `SPY`). All ETF accumulation signals must be mapped to UCITS-compliant equivalents on European exchanges (e.g. `QQQA.L` / `EQQQ.L` for Nasdaq-100; `VUSA.L` / `VUAG.L` for S&P 500).
+   * **FX Conversion Drag Mitigation**: Non-native currency orders face a 0.15% FX conversion fee per leg (0.30% round-trip). For GBP-funded accounts, prefer native GBX (pence)-denominated UCITS tickers on the London Stock Exchange to eliminate FX frictional drag.
+   * **Account Profile Invariant (Invest/ISA vs. CFD)**: Multi-day/multi-week DCA and structural accumulation must execute in Invest or ISA accounts (unleveraged, zero overnight financing fees). The CFD platform is restricted to short-term intraday plays due to compounding overnight swap costs.
+   * **Limit Order Invariant**: Precision entries targeting structural levels (Value Area Low, 50% FVG Consequent Encroachment) must use standalone Limit Orders (`/equity/orders/limit`) rather than automated social Pies or market orders, eliminating fill slippage.
    * **Rate Limits & Fail-Safe**: Per-account rate limits return HTTP 429. Adapters must fail safely, returning `(0.0, [])` upon error.
    * **Mock-First Testing**: Pytest tests must never issue live HTTP calls to Trading 212; always mock via `monkeypatch`.
 

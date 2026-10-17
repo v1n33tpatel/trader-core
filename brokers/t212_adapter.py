@@ -35,6 +35,56 @@ def to_t212_order_ticker(clean_symbol: str) -> str:
     return f"{s}_US_EQ"
 
 
+UCITS_ETF_MAP = {
+    "QQQ": {
+        "primary": "QQQA.L",
+        "primary_t212": "QQQA_l_EQ",
+        "sister_fund": "EQQQ.L",
+        "sister_t212": "EQQQ_l_EQ",
+        "hedged": "EQGB.L",
+        "hedged_t212": "EQGB_l_EQ",
+        "currency": "GBX",
+    },
+    "SPY": {
+        "primary": "VUSA.L",
+        "primary_t212": "VUSA_l_EQ",
+        "accumulating": "VUAG.L",
+        "accumulating_t212": "VUAG_l_EQ",
+        "currency": "GBX",
+    },
+    "IWM": {
+        "primary": "RTWO.L",
+        "primary_t212": "RTWO_l_EQ",
+        "currency": "GBX",
+    },
+    "FTSE": {
+        "primary": "VUKE.L",
+        "primary_t212": "VUKE_l_EQ",
+        "currency": "GBX",
+    },
+}
+
+
+def map_us_to_ucits(us_symbol: str) -> dict:
+    """
+    Returns UCITS equivalent details for a given US benchmark ETF symbol.
+    """
+    sym = us_symbol.upper().replace(".L", "").replace("_US_EQ", "").replace("_EQ", "").replace("_L_EQ", "")
+    return UCITS_ETF_MAP.get(sym, {})
+
+
+def calculate_ucits_target_price(us_spot: float, us_target: float, ucits_spot: float) -> float:
+    """
+    Maps a US dollar structural target price (e.g. QQQ VAL at $482.65 from $709.80 spot)
+    to the equivalent LSE UCITS ticker limit price in GBX pence:
+    Limit = UCITS_spot * (1 + (Target_USD - Spot_USD) / Spot_USD)
+    """
+    if us_spot <= 0 or ucits_spot <= 0:
+        return 0.0
+    pct_change = (us_target - us_spot) / us_spot
+    return round(ucits_spot * (1.0 + pct_change), 2)
+
+
 class Trading212Broker:
     def __init__(self, is_demo: bool = True):
         self.is_demo = is_demo
@@ -118,3 +168,41 @@ class Trading212Broker:
         except Exception as e:
             print(f"[T212-ERROR] {e}")
             return 0.0, []
+
+    def place_market_order(self, symbol: str, is_buy: bool, quantity: float) -> dict:
+        """
+        Submits a market order to Trading 212 API.
+        BUY requires quantity > 0; SELL requires quantity < 0.
+        """
+        if not self.api_key:
+            return {"status": "FAILED", "error": "Unconfigured credentials"}
+
+        raw_ticker = to_t212_order_ticker(symbol)
+        qty = abs(quantity) if is_buy else -abs(quantity)
+        payload = {
+            "ticker": raw_ticker,
+            "quantity": qty,
+        }
+        res = requests.post(f"{self.base_url}/equity/orders/market", headers=self._headers(), json=payload, timeout=5)
+        res.raise_for_status()
+        return res.json()
+
+    def place_limit_order(self, symbol: str, is_buy: bool, quantity: float, limit_price: float, time_validity: str = "DAY") -> dict:
+        """
+        Submits a precision limit order to Trading 212 API for structural pullbacks (VAL, FVG CE).
+        BUY requires quantity > 0; SELL requires quantity < 0.
+        """
+        if not self.api_key:
+            return {"status": "FAILED", "error": "Unconfigured credentials"}
+
+        raw_ticker = to_t212_order_ticker(symbol)
+        qty = abs(quantity) if is_buy else -abs(quantity)
+        payload = {
+            "ticker": raw_ticker,
+            "quantity": qty,
+            "limitPrice": round(limit_price, 4),
+            "timeValidity": time_validity,
+        }
+        res = requests.post(f"{self.base_url}/equity/orders/limit", headers=self._headers(), json=payload, timeout=5)
+        res.raise_for_status()
+        return res.json()

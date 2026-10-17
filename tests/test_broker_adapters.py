@@ -72,3 +72,66 @@ def test_t212_broker_unconfigured(monkeypatch: pytest.MonkeyPatch) -> None:
     cash, positions = broker.get_portfolio()
     assert cash == 0.0
     assert positions == []
+
+
+def test_t212_ucits_mapping_and_target_price():
+    from brokers.t212_adapter import map_us_to_ucits, calculate_ucits_target_price
+
+    # UCITS ETF mapping
+    qqq_map = map_us_to_ucits("QQQ")
+    assert qqq_map["primary"] == "QQQA.L"
+    assert qqq_map["sister_fund"] == "EQQQ.L"
+    assert qqq_map["currency"] == "GBX"
+
+    spy_map = map_us_to_ucits("SPY")
+    assert spy_map["primary"] == "VUSA.L"
+    assert spy_map["currency"] == "GBX"
+
+    # US-to-GBX proportional limit calculation
+    # QQQ drops from $709.80 to $482.65 (down ~32%)
+    # If EQQQ.L spot is 54102.0p, limit should be ~36794.75p
+    us_spot = 709.80
+    us_val = 482.65
+    ucits_spot = 54102.0
+    limit = calculate_ucits_target_price(us_spot, us_val, ucits_spot)
+    expected = round(54102.0 * (1.0 + (482.65 - 709.80) / 709.80), 2)
+    assert limit == expected
+    assert limit < ucits_spot
+
+
+def test_t212_order_placement(monkeypatch: pytest.MonkeyPatch):
+    from brokers.t212_adapter import Trading212Broker
+
+    monkeypatch.setenv("T212_API_KEY", "dummy_key")
+    monkeypatch.setenv("T212_API_SECRET", "dummy_secret")
+
+    posted_payloads = []
+
+    class MockResponse:
+        status_code = 200
+        def raise_for_status(self): pass
+        def json(self): return {"orderId": "12345", "status": "CONFIRMED"}
+
+    def mock_post(url, headers=None, json=None, timeout=None):
+        posted_payloads.append((url, json))
+        return MockResponse()
+
+    monkeypatch.setattr("brokers.t212_adapter.requests.post", mock_post)
+
+    broker = Trading212Broker()
+
+    # Market buy
+    res_mkt = broker.place_market_order("EQQQ.L", is_buy=True, quantity=5.0)
+    assert res_mkt["status"] == "CONFIRMED"
+    assert posted_payloads[0][0].endswith("/equity/orders/market")
+    assert posted_payloads[0][1]["ticker"] == "EQQQ_l_EQ"
+    assert posted_payloads[0][1]["quantity"] == 5.0
+
+    # Limit buy at calculated pullback price
+    res_lmt = broker.place_limit_order("EQQQ.L", is_buy=True, quantity=5.0, limit_price=36794.75, time_validity="DAY")
+    assert res_lmt["status"] == "CONFIRMED"
+    assert posted_payloads[1][0].endswith("/equity/orders/limit")
+    assert posted_payloads[1][1]["ticker"] == "EQQQ_l_EQ"
+    assert posted_payloads[1][1]["quantity"] == 5.0
+    assert posted_payloads[1][1]["limitPrice"] == 36794.75
+    assert posted_payloads[1][1]["timeValidity"] == "DAY"

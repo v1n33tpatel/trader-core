@@ -77,7 +77,81 @@ def place_t212_market_order(base_url: str, headers: dict, ticker: str, quantity:
 
 ---
 
-## 4. Pytest Mocking Pattern
+## 4. Limit Order Placement (Precision Entries)
+> [!IMPORTANT]
+> Use Limit Orders (`/equity/orders/limit`) for all structural pullback entries (VAL, FVG CE) to prevent slippage. Avoid automated social "Pies" which execute market-on-open orders with severe fill slippage.
+
+```python
+def place_t212_limit_order(
+    base_url: str,
+    headers: dict,
+    ticker: str,
+    quantity: float,
+    limit_price: float,
+    time_validity: str = "DAY"  # "DAY" or "GOOD_TILL_CANCEL"
+) -> dict:
+    qty = abs(quantity)
+    payload = {
+        "ticker": ticker,           # e.g. "EQQQ_l_EQ"
+        "quantity": qty,
+        "limitPrice": round(limit_price, 4),
+        "timeValidity": time_validity,
+    }
+    res = requests.post(f"{base_url}/equity/orders/limit", headers=headers, json=payload, timeout=5)
+    res.raise_for_status()
+    return res.json()
+```
+
+---
+
+## 5. UK/EU UCITS ETF Mapping Table (Invest / ISA Accounts)
+Direct US-domiciled ETFs cannot be purchased in UK/EU retail Invest or ISA accounts under PRIIPs regulations. Map US benchmarks to LSE UCITS equivalents:
+
+| US Benchmark | LSE UCITS Ticker | T212 API Ticker | TER | Currency | Trait |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **QQQ** | `QQQA.L` | `QQQA_l_EQ` | 0.13% | GBX (Pence) | Lowest TER, unhedged GBP tracking |
+| **QQQ** | `EQQQ.L` | `EQQQ_l_EQ` | 0.30% | GBX (Pence) | Sister fund to QQQ, distributing quarterly |
+| **QQQ** | `EQGB.L` | `EQGB_l_EQ` | 0.35% | GBX (Pence) | Accumulating, currency-hedged to GBP |
+| **SPY** | `VUSA.L` | `VUSA_l_EQ` | 0.07% | GBX (Pence) | S&P 500, distributing quarterly |
+| **SPY** | `VUAG.L` | `VUAG_l_EQ` | 0.07% | GBX (Pence) | S&P 500, accumulating |
+| **FTSE 100** | `VUKE.L` | `VUKE_l_EQ` | 0.09% | GBX (Pence) | Core UK equity benchmark |
+
+---
+
+## 6. FX Drag & Technical Target Mapping
+
+### A. FX Drag Rules
+* Trading USD-denominated tickers with GBP base currency incurs **0.15% on entry** and **0.15% on exit** (0.30% round trip).
+* Executing via native **GBX (pence)** UCITS trackers eliminates this FX drag entirely.
+
+### B. Proportional USD-to-GBX Limit Calculation
+When converting a US Dollar structural target (e.g., QQQ Value Area Low at $\$482.65$) to an LSE UCITS equivalent:
+
+$$\Delta\% = \frac{\text{Target}_{\text{USD}} - \text{Price}_{\text{US, spot}}}{\text{Price}_{\text{US, spot}}}$$
+$$\text{Limit}_{\text{GBX}} = \text{Price}_{\text{UCITS, spot}} \times (1 + \Delta\%)$$
+
+```python
+def calculate_ucits_target_price(us_spot: float, us_target: float, ucits_spot: float) -> float:
+    if us_spot <= 0 or ucits_spot <= 0:
+        return 0.0
+    pct_change = (us_target - us_spot) / us_spot
+    return round(ucits_spot * (1.0 + pct_change), 2)
+```
+
+---
+
+## 7. Account Profile Matrix
+| Feature | Invest Account | Tax-Free ISA | CFD Account |
+| :--- | :--- | :--- | :--- |
+| **Direct US ETFs (QQQ, SPY)** | ❌ Blocked (PRIIPs) | ❌ Blocked (PRIIPs) | ✅ Allowed (`QQQ_US_EQ`) |
+| **UCITS Equivalents (EQQQ, QQQA)**| ✅ Allowed | ✅ Allowed | ⚠️ Inefficient |
+| **Leverage / Margin** | 1:1 (Cash Only) | 1:1 (Cash Only) | Up to 1:5 (20% margin) |
+| **Overnight Financing / Swap** | None (£0.00) | None (£0.00) | Charged daily (compounding drag) |
+| **Best Strategy Fit** | Multi-day / Multi-week DCA | Multi-year Tax-Free DCA | Short-term intraday scalp/swing |
+
+---
+
+## 8. Pytest Mocking Pattern
 ```python
 def test_t212_portfolio(monkeypatch):
     class MockCashResponse:
