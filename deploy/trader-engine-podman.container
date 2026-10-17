@@ -1,0 +1,26 @@
+[Unit]
+Description=Trader Core Autonomous Engine Loop (Podman Quadlet)
+Wants=network-online.target
+After=network-online.target trader-dashboard.service
+
+[Container]
+Image=localhost/trader-core:latest
+ContainerName=trader-engine
+WorkingDir=/app
+Exec=python engine.py
+Environment=OLLAMA_HOST=http://10.10.10.15:11434
+Environment=OPEN_WEBUI_URL=http://192.168.2.15:8080
+Environment=TRADER_STATE_DB=/data/trader_state.db
+Volume=/etc/trader-core/.env:/app/.env:ro
+Volume=/var/lib/trader-core/data:/data:Z
+NoNewPrivileges=true
+ReadOnly=false
+Tmpfs=/tmp
+
+[Service]
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

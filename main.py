@@ -19,9 +19,23 @@ try:
 except Exception:
     BinanceBroker = None
 
+from quant_trading.admin_api import admin_blueprint
+from quant_trading.agent_c_api import agent_c_blueprint
+from quant_trading.orchestrator_api import orchestrator_blueprint
+from core.state_store import StateStore
+from feeds.ai_provider import AIProviderClient
+
 app = Flask(__name__)
 app.register_blueprint(research_blueprint)
+app.register_blueprint(admin_blueprint)
+app.register_blueprint(agent_c_blueprint)
+app.register_blueprint(orchestrator_blueprint)
 OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")
+
+
+def is_demo_mode() -> bool:
+    return StateStore().get_setting("environment", "demo").lower() == "demo"
+
 
 ETORO_PAIRS = {
     "ETH": {"id": 100002, "strategy": "1H RSI Mean Reversion"},
@@ -483,7 +497,8 @@ def index():
 def t212_portfolio():
     if not Trading212Broker: return jsonify({"cash": 0.0, "active_positions": 0, "positions": []})
     try:
-        t212 = Trading212Broker(is_demo=True)
+        demo = is_demo_mode()
+        t212 = Trading212Broker(is_demo=demo)
         cash, raw_pos = t212.get_portfolio()
         positions = []
         for p in raw_pos:
@@ -512,10 +527,11 @@ def t212_portfolio():
 @app.route("/api/etoro/portfolio")
 def etoro_portfolio():
     headers = load_etoro_headers()
+    env_segment = "demo" if is_demo_mode() else "live"
     try:
-        r = requests.get("https://public-api.etoro.com/api/v1/trading/info/demo/portfolio", headers=headers, timeout=5)
+        r = requests.get(f"https://public-api.etoro.com/api/v1/trading/info/{env_segment}/portfolio", headers=headers, timeout=5)
         raw_pos = r.json().get("clientPortfolio", {}).get("positions", []) if r.status_code == 200 else []
-        r_pnl = requests.get("https://public-api.etoro.com/api/v1/trading/info/demo/pnl", headers=headers, timeout=5)
+        r_pnl = requests.get(f"https://public-api.etoro.com/api/v1/trading/info/{env_segment}/pnl", headers=headers, timeout=5)
         pnl_map = {}
         if r_pnl.status_code == 200:
             for p in r_pnl.json().get("clientPortfolio", {}).get("positions", []):
@@ -537,15 +553,16 @@ def etoro_portfolio():
 
 @app.route("/api/binance/portfolio")
 def binance_portfolio():
-    b = BinanceBroker()
+    b = BinanceBroker(is_demo=is_demo_mode())
     cash, positions = b.get_portfolio()
     return jsonify({"cash": round(cash, 2), "active_positions": len(positions), "total_equity": round(cash, 2), "positions": positions})
 
 @app.route("/api/kraken/portfolio")
 def kraken_portfolio():
-    k = KrakenBroker()
+    k = KrakenBroker(is_demo=is_demo_mode())
     cash, positions = k.get_portfolio()
     return jsonify({"cash": round(cash, 2), "active_positions": len(positions), "total_equity": round(cash, 2), "positions": positions})
+
 
 _t212_cache = {"ts": 0, "data": []}
 @app.route("/api/search/t212")
@@ -611,11 +628,34 @@ def agent_query():
         "quantai": "You are QuantAI for MoneyMakingMachine - QWERTY CORP. Provide a concise cross-broker executive summary for Equities (T212) and Crypto (Binance/Kraken/eToro).",
         "price_action": f"You are the Institutional Price Action & Market Structure Agent. Evaluate {symbol} using swing pivot levels, liquidity sweeps, pinbar rejections, and break of structure (BOS). Identify key invalidation levels and 1:2 Risk/Reward targets. Give action: BUY, SELL, or HOLD."
     }
+    prompt = prompts.get(broker, prompts["t212"])
     try:
-        r = requests.post(f"{OLLAMA_URL}/api/generate", json={"model": "deepseek-r1:7b", "prompt": prompts.get(broker, prompts["t212"]), "stream": False}, timeout=35)
-        return jsonify({"analysis": r.json().get("response", "")}) if r.status_code == 200 else jsonify({"error": f"Ollama HTTP {r.status_code}"}), 500
+        store = StateStore()
+        provider = store.get_setting("ai_provider", "ollama")
+        ext_url = store.get_setting("external_ai_base_url", os.getenv("EXTERNAL_AI_BASE_URL", "https://openrouter.ai/api/v1"))
+        ext_key = store.get_setting("external_ai_api_key", os.getenv("EXTERNAL_AI_API_KEY", ""))
+        ext_model = store.get_setting("external_ai_model", os.getenv("EXTERNAL_AI_MODEL", "deepseek/deepseek-r1"))
+        client = AIProviderClient(
+            provider=provider,
+            ollama_host=OLLAMA_URL,
+            external_base_url=ext_url,
+            external_api_key=ext_key,
+            external_model=ext_model,
+            fallback_to_local=True
+        )
+        res = client.generate(prompt)
+        if res.get("error"):
+            return jsonify({"error": res["error"]}), 502
+        return jsonify({
+            "analysis": res.get("text", ""),
+            "provider_used": res.get("provider_used", "ollama"),
+            "model": res.get("model", "deepseek-r1:7b"),
+            "latency_ms": res.get("latency_ms", 0),
+            "fallback": res.get("fallback", False)
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 502
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

@@ -4,6 +4,8 @@ const brokerNames = {
   binance: "Binance Spot",
   kraken: "Kraken Spot",
   quantai: "QuantAI",
+  admin: "Admin & Control",
+  intel: "Market Intel (Agent C)",
 };
 
 const selectedBroker = document.querySelector(".broker-tab.is-active");
@@ -108,6 +110,36 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
       item.setAttribute("aria-selected", String(isActive));
     });
 
+    const adminPanel = document.querySelector("#admin-panel");
+    const intelPanel = document.querySelector("#intel-panel");
+    const standardPanels = document.querySelectorAll(
+      ".portfolio-panel, .backtest-panel, .sizing-panel, .search-panel, .agent-panel"
+    );
+
+    if (currentBroker === "admin") {
+      standardPanels.forEach((p) => (p.hidden = true));
+      if (intelPanel) intelPanel.hidden = true;
+      if (adminPanel) {
+        adminPanel.hidden = false;
+        loadAdminData();
+      }
+      return;
+    }
+
+    if (currentBroker === "intel") {
+      standardPanels.forEach((p) => (p.hidden = true));
+      if (adminPanel) adminPanel.hidden = true;
+      if (intelPanel) {
+        intelPanel.hidden = false;
+        loadMarketIntel(currentIntelSymbol);
+      }
+      return;
+    }
+
+    if (adminPanel) adminPanel.hidden = true;
+    if (intelPanel) intelPanel.hidden = true;
+    standardPanels.forEach((p) => (p.hidden = false));
+
     const broker = brokerNames[currentBroker];
     portfolioTitle.textContent = `${broker} Portfolio`;
     document.querySelector(".button-refresh span:last-child").textContent = `Refresh ${broker.split(" ")[0]}`;
@@ -120,6 +152,7 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
     loadPortfolio(currentBroker);
   });
 });
+
 
 refreshButton.addEventListener("click", () => {
   loadPortfolio(currentBroker);
@@ -949,6 +982,1027 @@ if (syncEquityBtn) {
       }
     }
   });
+updateKellyCalculator();
+
+/* =========================================================================
+   1. REAL VS. DEMO ACCOUNT SWITCHER
+   ========================================================================= */
+async function initEnvironmentSwitcher() {
+  const btnDemo = document.querySelector("#btn-env-demo");
+  const btnReal = document.querySelector("#btn-env-real");
+  const badge = document.querySelector("#env-badge");
+  const modal = document.querySelector("#real-mode-modal");
+  const btnCancel = document.querySelector("#btn-modal-cancel");
+  const btnConfirm = document.querySelector("#btn-modal-confirm");
+
+  function setEnvUI(env) {
+    const isDemo = env === "demo";
+    if (btnDemo) btnDemo.classList.toggle("is-active", isDemo);
+    if (btnReal) btnReal.classList.toggle("is-active", !isDemo);
+    if (badge) {
+      badge.textContent = isDemo ? "PRACTICE (SAFE)" : "REAL CAPITAL (LIVE)";
+      badge.className = isDemo ? "env-badge env-badge-demo" : "env-badge env-badge-real";
+    }
+  }
+
+  try {
+    const res = await fetch("/api/environment/mode");
+    const data = await res.json();
+    setEnvUI(data.environment || "demo");
+  } catch (e) {
+    setEnvUI("demo");
+  }
+
+  if (btnDemo) {
+    btnDemo.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/environment/mode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ environment: "demo" }),
+        });
+        const data = await res.json();
+        setEnvUI(data.environment || "demo");
+        if (currentBroker !== "admin") loadPortfolio(currentBroker);
+      } catch (err) {
+        console.error("Failed to switch to demo mode:", err);
+      }
+    });
+  }
+
+  if (btnReal) {
+    btnReal.addEventListener("click", () => {
+      if (modal) modal.hidden = false;
+    });
+  }
+
+  if (btnCancel) {
+    btnCancel.addEventListener("click", () => {
+      if (modal) modal.hidden = true;
+    });
+  }
+
+  if (btnConfirm) {
+    btnConfirm.addEventListener("click", async () => {
+      if (modal) modal.hidden = true;
+      try {
+        const res = await fetch("/api/environment/mode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ environment: "real" }),
+        });
+        const data = await res.json();
+        setEnvUI(data.environment || "real");
+        if (currentBroker !== "admin") loadPortfolio(currentBroker);
+      } catch (err) {
+        console.error("Failed to switch to real mode:", err);
+      }
+    });
+  }
 }
 
-updateKellyCalculator();
+/* =========================================================================
+   2. AUTOMATION & SELECTABLE STRATEGIES
+   ========================================================================= */
+async function initAutomationAndStrategies() {
+  const stratSelect = document.querySelector("#auto-strategy-select");
+  const modePills = document.querySelectorAll(".mode-pill");
+  const activeBadge = document.querySelector("#active-mode-badge");
+  const autoCardTitle = document.querySelector("#auto-card-title");
+  const btnToggle = document.querySelector("#btn-auto-toggle");
+  const toggleText = document.querySelector("#auto-toggle-text");
+  const toggleIcon = document.querySelector("#auto-toggle-icon");
+  const autoDot = document.querySelector("#auto-status-dot");
+  const autoIndicator = document.querySelector("#auto-status-indicator");
+  const quickModeLbl = document.querySelector("#auto-mode-label");
+  const quickStateLbl = document.querySelector("#auto-state-label");
+  const quickPill = document.querySelector("#auto-quick-pill");
+  const btnEval = document.querySelector("#btn-auto-eval");
+  const telemetryText = document.querySelector("#auto-telemetry-text");
+
+  // Load Strategy Catalog
+  try {
+    const res = await fetch("/api/strategies");
+    const data = await res.json();
+    if (data.strategies && stratSelect) {
+      stratSelect.innerHTML = "";
+      data.strategies.forEach((strat) => {
+        const opt = document.createElement("option");
+        opt.value = strat.id;
+        opt.textContent = `${strat.name} (${strat.execution_mode.toUpperCase()})`;
+        if (strat.id === data.active_strategy) opt.selected = true;
+        stratSelect.appendChild(opt);
+      });
+    }
+  } catch (err) {
+    console.warn("Could not load strategies catalog:", err);
+  }
+
+  // Load Automation Status
+  async function refreshAutomationStatus() {
+    try {
+      const res = await fetch("/api/automation/status");
+      const data = await res.json();
+      const isRunning = Boolean(data.is_running);
+      const mode = data.mode || "reactive";
+
+      if (autoDot) autoDot.classList.toggle("is-running", isRunning);
+      if (autoIndicator) autoIndicator.classList.toggle("is-running", isRunning);
+      if (btnToggle) btnToggle.classList.toggle("is-running", isRunning);
+      if (toggleText) toggleText.textContent = isRunning ? "Pause Automation" : "Start Automation";
+      if (toggleIcon) toggleIcon.textContent = isRunning ? "⏸" : "▶";
+      if (quickStateLbl) quickStateLbl.textContent = isRunning ? "ACTIVE" : "PAUSED";
+      if (quickModeLbl) quickModeLbl.textContent = mode.toUpperCase();
+
+      if (activeBadge) {
+        activeBadge.textContent = mode.toUpperCase();
+        activeBadge.className = `mode-badge mode-badge-${mode}`;
+      }
+      if (autoCardTitle) {
+        autoCardTitle.textContent = mode === "reactive"
+          ? "Reactive Price Action Engine"
+          : mode === "predictive" ? "Predictive Quant Momentum Engine" : "Hybrid Macro-Structural Engine";
+      }
+
+      modePills.forEach((p) => {
+        p.classList.toggle("is-active", p.dataset.mode === mode);
+      });
+
+      if (data.guardrails) {
+        const maxO = document.querySelector("#auto-max-order");
+        const stopL = document.querySelector("#auto-stop-loss");
+        const rr = document.querySelector("#auto-rr-target");
+        const sigs = document.querySelector("#auto-signals-count");
+        if (maxO) maxO.textContent = `$${data.guardrails.max_order_usd.toFixed(2)}`;
+        if (stopL) stopL.textContent = `-${data.guardrails.stop_loss_pct.toFixed(1)}%`;
+        if (rr) rr.textContent = `1:${data.guardrails.min_risk_reward.toFixed(1)}`;
+        if (sigs) sigs.textContent = String(data.signals_generated || 0);
+      }
+    } catch (err) {
+      console.warn("Could not load automation status:", err);
+    }
+  }
+
+  refreshAutomationStatus();
+
+  // Strategy change handler
+  if (stratSelect) {
+    stratSelect.addEventListener("change", async () => {
+      try {
+        await fetch("/api/strategies/select", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ strategy_id: stratSelect.value }),
+        });
+        refreshAutomationStatus();
+      } catch (e) {
+        console.error("Failed to select strategy:", e);
+      }
+    });
+  }
+
+  // Mode pill handler
+  modePills.forEach((pill) => {
+    pill.addEventListener("click", async () => {
+      const mode = pill.dataset.mode;
+      try {
+        await fetch("/api/automation/configure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode }),
+        });
+        refreshAutomationStatus();
+      } catch (e) {
+        console.error("Failed to set automation mode:", e);
+      }
+    });
+  });
+
+  // Toggle run handler
+  if (btnToggle) {
+    btnToggle.addEventListener("click", async () => {
+      try {
+        await fetch("/api/automation/toggle", { method: "POST" });
+        refreshAutomationStatus();
+      } catch (e) {
+        console.error("Failed to toggle automation:", e);
+      }
+    });
+  }
+
+  // Quick pill scroll
+  if (quickPill) {
+    quickPill.addEventListener("click", () => {
+      const card = document.querySelector("#automation-card");
+      if (card) {
+        if (currentBroker === "admin") {
+          document.querySelector("#tab-t212")?.click();
+        }
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+  }
+
+  // Evaluate handler
+  if (btnEval) {
+    btnEval.addEventListener("click", async () => {
+      if (telemetryText) telemetryText.textContent = "Running evaluation on current bar...";
+      try {
+        const symbol = document.querySelector("#market-symbol")?.value || "ETH";
+        const res = await fetch("/api/automation/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol }),
+        });
+        const evalData = await res.json();
+        if (telemetryText) {
+          telemetryText.textContent = `[${evalData.action}] ${evalData.symbol} @ $${evalData.current_price?.toFixed(2)} | Setup: ${evalData.pattern || "N/A"} | ${evalData.reason || ""}`;
+        }
+        refreshAutomationStatus();
+      } catch (e) {
+        if (telemetryText) telemetryText.textContent = `Evaluation failed: ${e.message}`;
+      }
+    });
+  }
+}
+
+/* =========================================================================
+   3. ADMIN WORKSPACE & TELEMETRY
+   ========================================================================= */
+async function loadAdminData() {
+  // Load Masked Keys
+  try {
+    const res = await fetch("/api/admin/keys");
+    const data = await res.json();
+    if (data.t212) {
+      const elK = document.querySelector("#hint-t212-key");
+      const elS = document.querySelector("#hint-t212-sec");
+      if (elK) elK.textContent = data.t212.key_preview ? `Current: ${data.t212.key_preview}` : "Current: Not configured";
+      if (elS) elS.textContent = data.t212.has_secret ? "Current: •••••••• (Configured)" : "Current: Not configured";
+    }
+    if (data.etoro) {
+      const elK = document.querySelector("#hint-etoro-key");
+      const elS = document.querySelector("#hint-etoro-sec");
+      if (elK) elK.textContent = data.etoro.key_preview ? `Current: ${data.etoro.key_preview}` : "Current: Not configured";
+      if (elS) elS.textContent = data.etoro.has_secret ? "Current: •••••••• (Configured)" : "Current: Not configured";
+    }
+    if (data.binance) {
+      const elK = document.querySelector("#hint-binance-key");
+      const elS = document.querySelector("#hint-binance-sec");
+      if (elK) elK.textContent = data.binance.key_preview ? `Current: ${data.binance.key_preview}` : "Current: Not configured";
+      if (elS) elS.textContent = data.binance.has_secret ? "Current: •••••••• (Configured)" : "Current: Not configured";
+    }
+    if (data.kraken) {
+      const elK = document.querySelector("#hint-kraken-key");
+      const elS = document.querySelector("#hint-kraken-sec");
+      if (elK) elK.textContent = data.kraken.key_preview ? `Current: ${data.kraken.key_preview}` : "Current: Not configured";
+      if (elS) elS.textContent = data.kraken.has_secret ? "Current: •••••••• (Configured)" : "Current: Not configured";
+    }
+  } catch (err) {
+    console.warn("Failed to load admin keys:", err);
+  }
+
+  // Load AI Configuration
+  try {
+    const res = await fetch("/api/admin/ai-config");
+    const data = await res.json();
+    const sel = document.querySelector("#ai-provider-select");
+    const url = document.querySelector("#ai-base-url");
+    const mod = document.querySelector("#ai-model-name");
+    const fb = document.querySelector("#ai-fallback-local");
+    const hint = document.querySelector("#hint-ai-key");
+    const provExt = document.querySelector("#prov-extai");
+
+    if (sel && data.provider) sel.value = data.provider;
+    if (url && data.external_base_url) url.value = data.external_base_url;
+    if (mod && data.external_model) mod.value = data.external_model;
+    if (fb && data.fallback_to_local !== undefined) fb.checked = Boolean(data.fallback_to_local);
+    if (hint) hint.textContent = data.has_api_key ? `Current: ${data.api_key_preview || "•••••••• (Configured)"}` : "Current: Not configured";
+    if (provExt) provExt.textContent = data.provider === "external" ? `${data.external_model || "External AI"}` : "Local Ollama";
+  } catch (err) {
+    console.warn("Failed to load AI config:", err);
+  }
+
+  // Load Agent Telemetry
+  try {
+    const res = await fetch("/api/admin/agents");
+    const data = await res.json();
+    if (data.agents) {
+      const engineAgent = data.agents.find((a) => a.id === "engine_loop");
+      if (engineAgent) {
+        const dot = document.querySelector("#engine-dot");
+        const badge = document.querySelector("#engine-state-badge");
+        const isRun = engineAgent.status === "running";
+        if (dot) {
+          dot.className = isRun ? "status-dot status-dot-online" : "status-dot";
+        }
+        if (badge) {
+          badge.textContent = engineAgent.status.toUpperCase();
+          badge.className = isRun ? "agent-state-badge" : "agent-state-badge agent-state-standby";
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to load agents telemetry:", err);
+  }
+
+  // Run initial latency probe
+  testAdminConnections();
+}
+
+async function testAdminConnections() {
+  try {
+    const res = await fetch("/api/admin/test-connection", { method: "POST" });
+    const data = await res.json();
+    if (data.services) {
+      Object.entries(data.services).forEach(([svc, info]) => {
+        const statEl = document.querySelector(`#stat-${svc}`);
+        const latEl = document.querySelector(`#lat-${svc}`);
+        const dot = document.querySelector(`#dot-${svc}`);
+        if (statEl) statEl.textContent = info.status.toUpperCase();
+        if (latEl) latEl.textContent = `${info.latency_ms} ms`;
+        if (dot) {
+          dot.className = info.status === "online" ? "api-dot is-online" : "api-dot is-offline";
+        }
+      });
+    }
+  } catch (err) {
+    console.warn("Connection test failed:", err);
+  }
+}
+
+function initAdminWorkspace() {
+  // Password Visibility Toggle
+  document.querySelectorAll(".btn-toggle-vis").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.dataset.target;
+      const input = document.getElementById(targetId);
+      if (input) {
+        const isPass = input.type === "password";
+        input.type = isPass ? "text" : "password";
+        btn.textContent = isPass ? "🔒" : "👁";
+      }
+    });
+  });
+
+  // Keys form submit
+  const formKeys = document.querySelector("#form-admin-keys");
+  const saveKeysStatus = document.querySelector("#save-keys-status");
+  if (formKeys) {
+    formKeys.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (saveKeysStatus) saveKeysStatus.textContent = "Saving credentials...";
+      const payload = {
+        T212_API_KEY: document.querySelector("#key-t212-val")?.value || "",
+        T212_API_SECRET: document.querySelector("#sec-t212-val")?.value || "",
+        ETORO_API_KEY: document.querySelector("#key-etoro-val")?.value || "",
+        ETORO_USER_KEY: document.querySelector("#sec-etoro-val")?.value || "",
+        BINANCE_API_KEY: document.querySelector("#key-binance-val")?.value || "",
+        BINANCE_API_SECRET: document.querySelector("#sec-binance-val")?.value || "",
+        KRAKEN_API_KEY: document.querySelector("#key-kraken-val")?.value || "",
+        KRAKEN_API_SECRET: document.querySelector("#sec-kraken-val")?.value || "",
+      };
+
+      try {
+        const res = await fetch("/api/admin/keys", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (saveKeysStatus) {
+          saveKeysStatus.textContent = `✓ Credentials saved (${data.updated_keys?.length || 0} updated)`;
+        }
+        loadAdminData();
+      } catch (err) {
+        if (saveKeysStatus) saveKeysStatus.textContent = `Error: ${err.message}`;
+      }
+    });
+  }
+
+  // Test All APIs button
+  const btnTestApis = document.querySelector("#btn-test-all-apis");
+  if (btnTestApis) {
+    btnTestApis.addEventListener("click", testAdminConnections);
+  }
+
+  // Refresh Agents button
+  const btnRefreshAgents = document.querySelector("#btn-refresh-agents");
+  if (btnRefreshAgents) {
+    btnRefreshAgents.addEventListener("click", loadAdminData);
+  }
+
+  // AI Test button
+  const btnTestAi = document.querySelector("#btn-test-ai");
+  const aiTestStatus = document.querySelector("#ai-test-status");
+  if (btnTestAi) {
+    btnTestAi.addEventListener("click", async () => {
+      if (aiTestStatus) aiTestStatus.textContent = "Pinging AI provider...";
+      const payload = {
+        provider: document.querySelector("#ai-provider-select")?.value || "ollama",
+        base_url: document.querySelector("#ai-base-url")?.value || "",
+        model: document.querySelector("#ai-model-name")?.value || "",
+        api_key: document.querySelector("#ai-api-key")?.value || "",
+      };
+      try {
+        const res = await fetch("/api/admin/ai-test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (aiTestStatus) {
+          if (data.status === "online") {
+            aiTestStatus.textContent = `✓ Online (${data.latency_ms} ms) - ${data.detail || ""}`;
+          } else {
+            aiTestStatus.textContent = `✗ ${data.status.toUpperCase()}: ${data.detail || "Connection failed"}`;
+          }
+        }
+      } catch (err) {
+        if (aiTestStatus) aiTestStatus.textContent = `Failed: ${err.message}`;
+      }
+    });
+  }
+
+  // AI Save form
+  const formAi = document.querySelector("#form-ai-config");
+  if (formAi) {
+    formAi.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (aiTestStatus) aiTestStatus.textContent = "Saving AI settings...";
+      const payload = {
+        provider: document.querySelector("#ai-provider-select")?.value || "ollama",
+        external_base_url: document.querySelector("#ai-base-url")?.value || "",
+        external_model: document.querySelector("#ai-model-name")?.value || "",
+        external_api_key: document.querySelector("#ai-api-key")?.value || "",
+        fallback_to_local: document.querySelector("#ai-fallback-local")?.checked ?? true,
+      };
+      try {
+        const res = await fetch("/api/admin/ai-config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (aiTestStatus) aiTestStatus.textContent = "✓ AI configuration saved";
+        loadAdminData();
+      } catch (err) {
+        if (aiTestStatus) aiTestStatus.textContent = `Error: ${err.message}`;
+      }
+    });
+  }
+}
+
+// Initialize New Modules on Page Load
+initEnvironmentSwitcher();
+initAutomationAndStrategies();
+initAdminWorkspace();
+initMarketIntel();
+initOrchestratorAdmin();
+
+// ==========================================================================
+// AGENT C: MARKET INTELLIGENCE TERMINAL LOGIC
+// ==========================================================================
+
+let currentIntelSymbol = "ETH";
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function initMarketIntel() {
+  const btnRefresh = document.querySelector("#btn-refresh-intel");
+  if (btnRefresh) {
+    btnRefresh.addEventListener("click", () => {
+      loadMarketIntel(currentIntelSymbol);
+    });
+  }
+
+  // Symbol selector buttons
+  document.querySelectorAll(".intel-sym-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".intel-sym-btn").forEach((b) => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      currentIntelSymbol = btn.dataset.sym || "ETH";
+      loadMarketIntel(currentIntelSymbol);
+    });
+  });
+
+  // Prompt suggestions for Agent C
+  document.querySelectorAll(".agent-c-prompt-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = document.querySelector("#agent-c-query-input");
+      if (input && btn.dataset.prompt) {
+        input.value = btn.dataset.prompt;
+        input.focus();
+      }
+    });
+  });
+
+  // Agent C Form Query
+  const formAgentC = document.querySelector("#agent-c-form");
+  if (formAgentC) {
+    formAgentC.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.querySelector("#agent-c-query-input");
+      const question = input?.value.trim() || "";
+      const respBox = document.querySelector("#agent-c-response");
+      const respText = document.querySelector("#agent-c-response-text");
+      const respMeta = document.querySelector("#agent-c-response-meta");
+      const submitBtn = document.querySelector("#btn-agent-c-query");
+
+      if (respBox) respBox.hidden = false;
+      if (respText) respText.textContent = "Agent C (Grok) is synthesizing live market telemetry...";
+      if (respMeta) respMeta.textContent = "";
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const res = await fetch("/api/agent-c/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: currentIntelSymbol, question }),
+        });
+        if (!res.ok) throw new Error(`Query failed (HTTP ${res.status})`);
+        const data = await res.json();
+        if (respText) respText.textContent = data.briefing || "No response received.";
+        if (respMeta) {
+          respMeta.textContent = `Provider: ${data.provider_used || "xai/grok"} · Model: ${data.model || "grok-2-latest"} · Latency: ${Math.round(data.latency_ms || 0)}ms`;
+        }
+      } catch (err) {
+        if (respText) respText.textContent = `Error consulting Agent C: ${err.message}`;
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  }
+}
+
+async function loadMarketIntel(symbol = "ETH") {
+  const sym = symbol.toUpperCase();
+  try {
+    const res = await fetch(`/api/agent-c/intel?symbol=${encodeURIComponent(sym)}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Intel fetch failed (HTTP ${res.status})`);
+    const data = await res.json();
+    renderMarketIntel(data);
+  } catch (err) {
+    console.error("Failed to load Agent C market intel:", err);
+  }
+}
+
+function renderMarketIntel(data) {
+  if (!data) return;
+  const { social, calendar, news, company } = data;
+
+  // 1. Topline Sentiment
+  if (social) {
+    const badge = document.querySelector("#intel-sentiment-badge");
+    const fill = document.querySelector("#intel-sentiment-fill");
+    const bullPct = document.querySelector("#intel-bull-pct");
+    const bearPct = document.querySelector("#intel-bear-pct");
+    const velocity = document.querySelector("#intel-velocity");
+
+    const score = social.sentiment_score ?? 0;
+    const sign = score > 0 ? "+" : "";
+    if (badge) {
+      badge.textContent = `${sign}${score.toFixed(2)} ${social.sentiment_label || "NEUTRAL"}`;
+      badge.className = "sentiment-score-badge " + (score > 0.15 ? "" : score < -0.15 ? "is-bearish" : "is-neutral");
+    }
+
+    if (fill) {
+      const pct = Math.max(0, Math.min(100, Math.round(((score + 1) / 2) * 100)));
+      fill.style.width = `${pct}%`;
+    }
+
+    if (bullPct) bullPct.textContent = `Bulls: ${social.bull_percentage}%`;
+    if (bearPct) bearPct.textContent = `Bears: ${social.bear_percentage}%`;
+    if (velocity && social.mention_velocity_hr) {
+      velocity.textContent = Number(social.mention_velocity_hr).toLocaleString();
+    }
+
+    // Render Chat Stream
+    const chatContainer = document.querySelector("#chat-stream-container");
+    if (chatContainer && Array.isArray(social.chatter_stream)) {
+      chatContainer.innerHTML = social.chatter_stream.map((c) => {
+        const isDiscord = (c.source || "").toLowerCase().includes("discord");
+        const sentClass = (c.sentiment || "NEUTRAL").toLowerCase();
+        return `
+          <div class="chat-card">
+            <div class="chat-card-top">
+              <div>
+                <span class="chat-source-tag ${isDiscord ? "discord" : ""}">${escapeHtml(c.source || "Social")}</span>
+                <span class="chat-user">${escapeHtml(c.user || "")}</span>
+              </div>
+              <span class="chat-time">${escapeHtml(c.time || "")}</span>
+            </div>
+            <div class="chat-text">${escapeHtml(c.text || "")}</div>
+            <div class="chat-card-bottom">
+              <span class="sentiment-pill ${sentClass}">${escapeHtml(c.sentiment || "NEUTRAL")}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // Whale Alerts
+    const whaleBox = document.querySelector("#whale-alerts-box");
+    if (whaleBox) {
+      if (Array.isArray(social.whale_alerts) && social.whale_alerts.length > 0) {
+        whaleBox.innerHTML = social.whale_alerts.map((w) => `
+          <div class="whale-card">
+            <div>
+              <strong>🐋 WHALE ${escapeHtml(w.type || "FLOW")}:</strong>
+              <span>${escapeHtml(w.amount || "")} ${escapeHtml(w.asset || "")} — ${escapeHtml(w.detail || "")}</span>
+            </div>
+            <span class="sentiment-pill ${w.impact === "BEARISH" ? "bearish" : "bullish"}">${escapeHtml(w.impact || "INFO")}</span>
+          </div>
+        `).join("");
+      } else {
+        whaleBox.innerHTML = "";
+      }
+    }
+  }
+
+  // 2. Macro Event Risk & Calendar
+  if (calendar) {
+    const riskPill = document.querySelector("#intel-event-risk-pill");
+    const countdown = document.querySelector("#intel-event-countdown");
+    const sentinelStatus = document.querySelector("#intel-risk-sentinel-status");
+    const advisoryText = document.querySelector("#calendar-advisory-text");
+    const advisoryBox = document.querySelector("#calendar-advisory-box");
+
+    const level = calendar.event_risk_level || "LOW";
+    if (riskPill) {
+      riskPill.textContent = `${level} EVENT RISK`;
+      riskPill.className = "event-risk-pill " + (level === "HIGH" ? "risk-high" : level === "MEDIUM" ? "risk-medium" : "");
+    }
+
+    if (countdown && calendar.next_tier1_event) {
+      const next = calendar.next_tier1_event;
+      const mins = next.minutes_away || 0;
+      const hours = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      const timeStr = hours > 0 ? `${hours}h ${remMins}m` : `${remMins}m`;
+      countdown.textContent = `Next: ${next.event} (in ${timeStr})`;
+    }
+
+    if (sentinelStatus) {
+      if (level === "HIGH") {
+        sentinelStatus.className = "risk-sentinel-status halted";
+        sentinelStatus.innerHTML = '<span class="sentinel-dot"></span>RiskSentinel: EVENT RISK HALT ACTIVE';
+      } else {
+        sentinelStatus.className = "risk-sentinel-status";
+        sentinelStatus.innerHTML = '<span class="sentinel-dot"></span>RiskSentinel: CLEAR TO TRADE';
+      }
+    }
+
+    if (advisoryText && calendar.risk_advisory) {
+      advisoryText.textContent = calendar.risk_advisory;
+    }
+    if (advisoryBox) {
+      advisoryBox.className = "calendar-advisory-box " + (level === "HIGH" ? "advisory-high" : "");
+    }
+
+    // Calendar Table
+    const tbody = document.querySelector("#calendar-table-body");
+    if (tbody && Array.isArray(calendar.events)) {
+      tbody.innerHTML = calendar.events.map((ev) => {
+        const impClass = (ev.impact || "LOW").toLowerCase();
+        return `
+          <tr>
+            <td class="event-name">${escapeHtml(ev.event || "")}</td>
+            <td class="event-time">${escapeHtml(ev.release_time || "")}</td>
+            <td class="event-val">${escapeHtml(ev.forecast || "—")}</td>
+            <td class="event-val">${escapeHtml(ev.previous || "—")}</td>
+            <td><span class="impact-pill impact-${impClass}">${escapeHtml(ev.impact || "LOW")}</span></td>
+          </tr>
+        `;
+      }).join("");
+    }
+  }
+
+  // 3. Breaking News Feeds
+  if (Array.isArray(news)) {
+    const newsContainer = document.querySelector("#news-stream-container");
+    if (newsContainer) {
+      newsContainer.innerHTML = news.map((item) => {
+        const sentClass = (item.sentiment || "NEUTRAL").toLowerCase();
+        const impClass = (item.impact || "LOW").toLowerCase();
+        const symTags = Array.isArray(item.symbols)
+          ? item.symbols.map((s) => `<span class="news-sym-tag">${escapeHtml(s)}</span>`).join("")
+          : "";
+        return `
+          <div class="news-card">
+            <div class="news-topline">
+              <span class="news-source">${escapeHtml(item.source || "Newswire")}</span>
+              <span class="news-time">${escapeHtml(item.timestamp || "")}</span>
+            </div>
+            <div class="news-title">${escapeHtml(item.title || "")}</div>
+            <div class="news-summary">${escapeHtml(item.summary || "")}</div>
+            <div class="news-bottomline">
+              <div class="news-symbols">${symTags}</div>
+              <div style="display:flex;gap:4px;">
+                <span class="sentiment-pill ${sentClass}">${escapeHtml(item.sentiment || "NEUTRAL")}</span>
+                <span class="impact-pill impact-${impClass}">${escapeHtml(item.impact || "LOW")}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+  }
+
+  // 4. Company Fundamentals
+  if (company) {
+    const badge = document.querySelector("#company-symbol-badge");
+    if (badge) badge.textContent = data.symbol || "EQUITY";
+
+    const setField = (id, val) => {
+      const el = document.querySelector(id);
+      if (el) el.textContent = (val !== null && val !== undefined && val !== "") ? String(val) : "—";
+    };
+
+    setField("#fund-name", company.name);
+    setField("#fund-sector", company.sector);
+    setField("#fund-mcap", company.market_cap);
+    setField("#fund-pe", company.pe_ratio ? `${company.pe_ratio}x` : "N/A");
+    setField("#fund-fpe", company.forward_pe ? `${company.forward_pe}x` : "N/A");
+    setField("#fund-eps", company.eps ? `$${company.eps}` : "N/A");
+    setField("#fund-beta", company.beta ? String(company.beta) : "N/A");
+    setField("#fund-range", company.range_52w);
+    setField("#fund-div", company.dividend_yield);
+    setField("#fund-earnings", company.next_earnings_date);
+  }
+
+  // 5. Engine / Grok Badge
+  const engineBadge = document.querySelector("#agent-c-engine-badge");
+  if (engineBadge) {
+    const prov = (data.provider_used || "grok").toUpperCase();
+    engineBadge.innerHTML = `<span class="status-dot"></span>${prov} READY`;
+  }
+}
+
+// ==========================================================================
+// AI ORCHESTRATOR (OLLAMA / OPEN-WEBUI) ADMIN LOGIC
+// ==========================================================================
+
+function initOrchestratorAdmin() {
+  const typeSelect = document.querySelector("#orch-type-select");
+  const baseUrlInput = document.querySelector("#orch-base-url");
+  const modelInput = document.querySelector("#orch-model-name");
+  const apiKeyInput = document.querySelector("#orch-api-key");
+  const testBtn = document.querySelector("#btn-test-orchestrator");
+  const testStatus = document.querySelector("#orch-test-status");
+  const formOrch = document.querySelector("#form-orchestrator-config");
+  const copyToolBtn = document.querySelector("#btn-copy-owui-tool");
+
+  if (typeSelect && baseUrlInput) {
+    typeSelect.addEventListener("change", () => {
+      if (typeSelect.value === "ollama") {
+        if (!baseUrlInput.value || baseUrlInput.value.includes("8080") || baseUrlInput.value.includes("3000")) {
+          baseUrlInput.value = "http://10.10.10.15:11434";
+        }
+      } else if (typeSelect.value === "open_webui") {
+        if (!baseUrlInput.value || baseUrlInput.value.includes("11434")) {
+          baseUrlInput.value = "http://192.168.2.15:8080";
+        }
+      }
+    });
+  }
+
+  if (testBtn) {
+    testBtn.addEventListener("click", async () => {
+      if (testStatus) testStatus.textContent = "Probing orchestrator host...";
+      try {
+        const res = await fetch("/api/orchestrator/status", { cache: "no-store" });
+        const data = await res.json();
+        if (testStatus) {
+          if (data.status === "online") {
+            testStatus.textContent = `✓ Online (${data.latency_ms} ms) - Type: ${data.type || "Ollama"}`;
+          } else {
+            testStatus.textContent = `✗ Offline: ${data.error || "Cannot reach host"}`;
+          }
+        }
+      } catch (err) {
+        if (testStatus) testStatus.textContent = `Error: ${err.message}`;
+      }
+    });
+  }
+
+  if (formOrch) {
+    formOrch.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (testStatus) testStatus.textContent = "Saving configuration...";
+      const payload = {
+        orchestrator_url: baseUrlInput?.value.trim() || "",
+        orchestrator_model: modelInput?.value.trim() || "",
+        open_webui_api_key: apiKeyInput?.value.trim() || "",
+      };
+      try {
+        const res = await fetch("/api/orchestrator/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (testStatus) {
+          if (data.status === "success") {
+            const probe = data.probe || {};
+            testStatus.textContent = `✓ Saved & Verified: ${probe.status || "ready"} (${probe.latency_ms || 0} ms)`;
+          } else {
+            testStatus.textContent = `Error: ${data.message || "Failed to save"}`;
+          }
+        }
+      } catch (err) {
+        if (testStatus) testStatus.textContent = `Save error: ${err.message}`;
+      }
+    });
+  }
+
+  if (copyToolBtn) {
+    copyToolBtn.addEventListener("click", async () => {
+      const origText = copyToolBtn.textContent;
+      try {
+        const res = await fetch("/api/orchestrator/tool-script");
+        if (!res.ok) throw new Error("Could not fetch script");
+        const data = await res.json();
+        if (data.code) {
+          await navigator.clipboard.writeText(data.code);
+          copyToolBtn.textContent = "✓ Copied to Clipboard!";
+          setTimeout(() => {
+            copyToolBtn.textContent = origText;
+          }, 3000);
+        }
+      } catch (err) {
+        copyToolBtn.textContent = "✗ Copy failed";
+        setTimeout(() => {
+          copyToolBtn.textContent = origText;
+        }, 2000);
+      }
+    });
+  }
+
+  // Open-WebUI Workspace & RAG Manager
+  const btnSyncOwui = document.querySelector("#btn-sync-openwebui");
+  const btnInspectOwui = document.querySelector("#btn-inspect-openwebui");
+  const btnPreviewRag = document.querySelector("#btn-preview-rag");
+  const fastModelSelect = document.querySelector("#owui-fast-base-model");
+  const deepModelSelect = document.querySelector("#owui-deep-base-model");
+  const syncQuickStatus = document.querySelector("#owui-sync-quick-status");
+  const syncBox = document.querySelector("#owui-sync-box");
+  const syncBadge = document.querySelector("#owui-sync-badge");
+  const syncLog = document.querySelector("#owui-sync-log");
+
+  function getTargetOwuiUrl() {
+    let url = baseUrlInput?.value.trim() || "";
+    if (!url || url.includes("11434")) {
+      url = "http://192.168.2.15:8080";
+    }
+    return url;
+  }
+
+  function appendLog(line) {
+    if (!syncLog) return;
+    const ts = new Date().toLocaleTimeString();
+    syncLog.textContent += `[${ts}] ${line}\n`;
+    syncLog.scrollTop = syncLog.scrollHeight;
+  }
+
+  function setBadgeState(state, text) {
+    if (!syncBadge) return;
+    syncBadge.className = `sync-badge ${state}`;
+    syncBadge.textContent = text || state.toUpperCase();
+  }
+
+  if (btnSyncOwui) {
+    btnSyncOwui.addEventListener("click", async () => {
+      const owuiUrl = getTargetOwuiUrl();
+      const apiKey = apiKeyInput?.value.trim() || "";
+      const fastModel = fastModelSelect?.value || "llama3.1:8b";
+      const deepModel = deepModelSelect?.value || "deepseek-r1:14b";
+
+      if (syncBox) syncBox.hidden = false;
+      if (syncLog) syncLog.textContent = "";
+      setBadgeState("running", "PROVISIONING");
+      if (syncQuickStatus) syncQuickStatus.textContent = "Deploying workspace to Open-WebUI...";
+      btnSyncOwui.disabled = true;
+
+      appendLog(`Connecting to Open-WebUI at: ${owuiUrl}`);
+      appendLog(`Base models: Fast [${fastModel}] | Deep Reasoner [${deepModel}]`);
+
+      try {
+        const res = await fetch("/api/orchestrator/openwebui/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            open_webui_url: owuiUrl,
+            api_key: apiKey,
+            fast_base_model: fastModel,
+            deep_base_model: deepModel,
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.status === "success") {
+          setBadgeState("success", "PROVISIONED");
+          appendLog("✓ Open-WebUI Host Online");
+          appendLog(`✓ Tool Plugin: ${data.tool?.tool_id || "trader_core_tools"} (${data.tool?.status || "deployed"})`);
+          appendLog(`✓ Knowledge Base: ${data.rag?.knowledge_name || "trader_core_rag"} (${data.rag?.knowledge_id || "active"})`);
+          if (Array.isArray(data.rag?.uploaded_files)) {
+            data.rag.uploaded_files.forEach(f => appendLog(`   📄 Uploaded: ${f.filename}`));
+          }
+          appendLog("✓ Dual Models Registered:");
+          if (Array.isArray(data.models?.models)) {
+            data.models.models.forEach(m => appendLog(`   🤖 ${m.name} (${m.id})`));
+          }
+          appendLog("✓ Quick Prompts Registered:");
+          if (Array.isArray(data.prompts?.prompts)) {
+            data.prompts.prompts.forEach(p => appendLog(`   ⚡ ${p.command} (${p.status})`));
+          }
+          appendLog("🚀 Workspace successfully optimized and ready!");
+          if (syncQuickStatus) syncQuickStatus.textContent = "✓ Workspace provisioned!";
+        } else {
+          setBadgeState("error", "FAILED");
+          appendLog(`✗ Provisioning error: ${data.message || "Failed"}`);
+          if (syncQuickStatus) syncQuickStatus.textContent = "✗ Provisioning failed";
+        }
+      } catch (err) {
+        setBadgeState("error", "ERROR");
+        appendLog(`✗ Network error: ${err.message}`);
+        if (syncQuickStatus) syncQuickStatus.textContent = `Error: ${err.message}`;
+      } finally {
+        btnSyncOwui.disabled = false;
+      }
+    });
+  }
+
+  if (btnInspectOwui) {
+    btnInspectOwui.addEventListener("click", async () => {
+      const owuiUrl = getTargetOwuiUrl();
+      const apiKey = apiKeyInput?.value.trim() || "";
+
+      if (syncBox) syncBox.hidden = false;
+      if (syncLog) syncLog.textContent = "";
+      setBadgeState("running", "INSPECTING");
+      appendLog(`Inspecting Open-WebUI workspace at: ${owuiUrl}...`);
+
+      try {
+        const query = new URLSearchParams({ url: owuiUrl, api_key: apiKey });
+        const res = await fetch(`/api/orchestrator/openwebui/inspect?${query.toString()}`);
+        const data = await res.json();
+
+        if (data.status === "online") {
+          setBadgeState("ready", "AUDITED");
+          appendLog(`✓ Host status: ONLINE (${data.version || "Open-WebUI"})`);
+          appendLog(`• Tools (${(data.tools || []).length}):`);
+          (data.tools || []).forEach(t => appendLog(`   - [${t.id}] ${t.name}`));
+          appendLog(`• Knowledge Bases (${(data.knowledge_bases || []).length}):`);
+          (data.knowledge_bases || []).forEach(k => appendLog(`   - [${k.id}] ${k.name} (${k.num_files || 0} files)`));
+          appendLog(`• Custom Models (${(data.models || []).length}):`);
+          (data.models || []).forEach(m => appendLog(`   - [${m.id}] ${m.name}`));
+          appendLog(`• Quick Prompts (${(data.prompts || []).length}):`);
+          (data.prompts || []).forEach(p => appendLog(`   - ${p.command}: ${p.title}`));
+        } else {
+          setBadgeState("error", "OFFLINE");
+          appendLog(`✗ Inspection failed: Host is ${data.status} (${data.error || "Cannot reach host"})`);
+        }
+      } catch (err) {
+        setBadgeState("error", "ERROR");
+        appendLog(`✗ Inspection error: ${err.message}`);
+      }
+    });
+  }
+
+  if (btnPreviewRag) {
+    btnPreviewRag.addEventListener("click", async () => {
+      if (syncBox) syncBox.hidden = false;
+      if (syncLog) syncLog.textContent = "";
+      setBadgeState("ready", "RAG PLAYBOOKS");
+      appendLog("Loading Institutional RAG Playbooks preview...");
+
+      try {
+        const res = await fetch("/api/orchestrator/openwebui/rag-preview");
+        const data = await res.json();
+        if (data.status === "success" && Array.isArray(data.documents)) {
+          appendLog(`✓ Compiled ${data.documents.length} Institutional RAG Playbooks for Knowledge Base:\n`);
+          data.documents.forEach((doc, idx) => {
+            appendLog(`[${idx + 1}] ${doc.filename}`);
+            appendLog(`    Title:       ${doc.title}`);
+            appendLog(`    Description: ${doc.description}`);
+            appendLog(`    Length:      ${doc.content.length} characters\n`);
+          });
+          appendLog("These documents are auto-embedded into Open-WebUI Knowledge Base during 1-click provisioning.");
+        } else {
+          appendLog("✗ Could not load RAG playbooks preview.");
+        }
+      } catch (err) {
+        appendLog(`✗ Preview error: ${err.message}`);
+      }
+    });
+  }
+}

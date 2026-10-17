@@ -1,12 +1,30 @@
 import os
 import requests
 import json
+from feeds.ai_provider import AIProviderClient
+from core.state_store import StateStore
 
 class AIStrategyReasoner:
-    def __init__(self, ollama_host: str = None, model: str = None):
-        host = (ollama_host or os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")).rstrip("/")
-        self.ollama_url = f"{host}/api/generate"
-        self.model = model or os.getenv("OLLAMA_MODEL", "deepseek-r1:7b")
+    def __init__(self, ollama_host: str = None, model: str = None, provider_client: AIProviderClient = None):
+        if provider_client:
+            self.client = provider_client
+        else:
+            store = StateStore()
+            provider = store.get_setting("ai_provider", "ollama")
+            ext_url = store.get_setting("external_ai_base_url", os.getenv("EXTERNAL_AI_BASE_URL", "https://openrouter.ai/api/v1"))
+            ext_key = store.get_setting("external_ai_api_key", os.getenv("EXTERNAL_AI_API_KEY", ""))
+            ext_model = store.get_setting("external_ai_model", os.getenv("EXTERNAL_AI_MODEL", "deepseek/deepseek-r1"))
+            
+            self.client = AIProviderClient(
+                provider=provider,
+                ollama_host=ollama_host,
+                ollama_model=model,
+                external_base_url=ext_url,
+                external_api_key=ext_key,
+                external_model=ext_model,
+                fallback_to_local=True
+            )
+        self.model = self.client.external_model if self.client.provider == "external" else self.client.ollama_model
 
     def analyze_macro_strategy(self, portfolio_cash, spy_price, spy_sma200, forex_data):
         prompt = f"""
@@ -23,20 +41,9 @@ Provide your response structured as:
 2. Asset Allocation Bias
 3. Recommended Action
 """
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False
-        }
+        res = self.client.generate(prompt)
+        return res.get("text", "No response generated.")
 
-        try:
-            response = requests.post(self.ollama_url, json=payload, timeout=30)
-            if response.status_code == 200:
-                return response.json().get("response", "No response generated.")
-            else:
-                return f"[AI-ERROR] Ollama returned status code {response.status_code}"
-        except Exception as e:
-            return f"[AI-ERROR] Failed to connect to DeepSeek-R1 stack: {e}"
 
     def analyze_price_action(self, symbol: str, price_action_data: dict, current_price: float = None):
         prompt = f"""
@@ -61,17 +68,6 @@ Provide your response structured as:
 2. Liquidity & Order Flow Assessment (Sweeps & Wick Rejections)
 3. Trade Recommendation (BUY, SELL, or mandatory HOLD if no confirmed structural pattern is present; state exact Invalidation and R:R Target)
 """
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False
-        }
-        try:
-            response = requests.post(self.ollama_url, json=payload, timeout=35)
-            if response.status_code == 200:
-                return response.json().get("response", "No response generated.")
-            else:
-                return f"[AI-ERROR] Ollama returned status code {response.status_code}"
-        except Exception as e:
-            return f"[AI-ERROR] Failed to connect to DeepSeek-R1 stack: {e}"
+        res = self.client.generate(prompt)
+        return res.get("text", "No response generated.")
 

@@ -32,12 +32,40 @@ class StateStore:
                     order_count INTEGER
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TIMESTAMP
+                )
+            """)
             conn.commit()
 
     def record_trade(self, position_id: str, symbol: str, broker: str, side: str, units: float, price: float):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO positions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (position_id, symbol, broker, side, units, price, price, datetime.now(timezone.utc))
+                (position_id, symbol, broker, side, units, price, price, datetime.now(timezone.utc).isoformat())
             )
             conn.commit()
+
+    def set_setting(self, key: str, value: str):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO settings VALUES (?, ?, ?)",
+                (key, str(value), datetime.now(timezone.utc).isoformat())
+            )
+            conn.commit()
+
+
+    def get_setting(self, key: str, default: str | None = None) -> str | None:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT value FROM settings WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            return row[0] if row else default
+
+    def get_all_settings(self) -> dict[str, str]:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT key, value FROM settings")
+            return {row[0]: row[1] for row in cursor.fetchall()}
+

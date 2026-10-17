@@ -26,6 +26,24 @@
           </div>
           <div class="connection-state"><span class="status-dot"></span>BROKER APIs <span class="state-divider">·</span> DATA ON DEMAND</div>
         </div>
+
+        <div class="topbar-center">
+          <div class="environment-switcher" id="environment-switcher">
+            <span class="env-label">ACCOUNT MODE</span>
+            <div class="env-toggle-wrap" role="group" aria-label="Account Mode Switcher">
+              <button type="button" class="env-btn is-active" id="btn-env-demo" data-env="demo">DEMO</button>
+              <button type="button" class="env-btn" id="btn-env-real" data-env="real">REAL</button>
+            </div>
+            <span class="env-badge env-badge-demo" id="env-badge">PRACTICE (SAFE)</span>
+          </div>
+
+          <div class="automation-quick-pill" id="auto-quick-pill" title="Automation Engine: Click to configure">
+            <span class="auto-dot" id="auto-status-dot"></span>
+            <span class="auto-mode-label" id="auto-mode-label">REACTIVE</span>
+            <span class="auto-state-label" id="auto-state-label">PAUSED</span>
+          </div>
+        </div>
+
         <div class="inference-state">
           <span class="inference-label">API CONNECTIONS</span>
           <div class="api-status-list" role="list" aria-label="API connection statuses">
@@ -61,7 +79,11 @@
         <button class="broker-tab" id="tab-binance" type="button" role="tab" aria-selected="false" data-broker="binance">Binance Spot</button>
         <button class="broker-tab" id="tab-kraken" type="button" role="tab" aria-selected="false" data-broker="kraken">Kraken Spot</button>
         <button class="broker-tab" id="tab-quantai" type="button" role="tab" aria-selected="false" data-broker="quantai">QuantAI</button>
+        <button class="broker-tab broker-tab-intel" id="tab-intel" type="button" role="tab" aria-selected="false" data-broker="intel">⚡ Market Intel (Agent C)</button>
+        <button class="broker-tab broker-tab-admin" id="tab-admin" type="button" role="tab" aria-selected="false" data-broker="admin">⚙ Admin &amp; Control</button>
       </nav>
+
+
 
       <main>
         <section class="panel portfolio-panel" aria-labelledby="portfolio-title">
@@ -79,6 +101,84 @@
                 <span class="refresh-symbol" aria-hidden="true">↻</span>
                 <span>Refresh T212</span>
               </button>
+            </div>
+          </div>
+
+          <div class="automation-card" id="automation-card">
+            <div class="automation-header">
+              <div class="automation-title">
+                <span class="eyebrow">AUTOMATION &amp; STRATEGY ENGINE</span>
+                <div class="automation-active-line">
+                  <span class="auto-status-indicator" id="auto-status-indicator"></span>
+                  <strong id="auto-card-title">Reactive Price Action Engine</strong>
+                  <span class="mode-badge mode-badge-reactive" id="active-mode-badge">REACTIVE</span>
+                </div>
+              </div>
+              <div class="automation-actions">
+                <button type="button" class="button button-auto-toggle" id="btn-auto-toggle">
+                  <span class="auto-toggle-icon" id="auto-toggle-icon" aria-hidden="true">▶</span>
+                  <span id="auto-toggle-text">Start Automation</span>
+                </button>
+                <button type="button" class="button button-auto-eval" id="btn-auto-eval" title="Manually evaluate current bar for structural setup">
+                  <span>⚡ Evaluate Now</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="automation-controls-grid">
+              <label class="field-control">
+                <span>ASSIGNED STRATEGY</span>
+                <select id="auto-strategy-select" aria-label="Select strategy">
+                  <option value="price_action" selected>Institutional Price Action &amp; Market Structure (Reactive)</option>
+                  <option value="atr_trailing_breakout">ATR Trailing Breakout (Predictive)</option>
+                  <option value="rsi_reversion">1H RSI Mean Reversion (Predictive)</option>
+                  <option value="fvg_breakout">Fair Value Gap Breakout (Hybrid)</option>
+                  <option value="sma_macro_regime">200-Day SMA Macro Regime (Predictive)</option>
+                  <option value="dynamic_dca">Dynamic Regime-Aware DCA (Predictive)</option>
+                  <option value="dividend_dca">Dividend DCA Yield Engine (Predictive)</option>
+                  <option value="london_ny_overlap">London/NY Overlap Momentum (Reactive)</option>
+                  <option value="forex_rsi_swing">1H Forex RSI Swing (Predictive)</option>
+                </select>
+              </label>
+
+              <div class="field-control">
+                <span>AUTOMATION MODE</span>
+                <div class="mode-pills" role="radiogroup" aria-label="Automation Mode">
+                  <button type="button" class="mode-pill is-active" data-mode="reactive" title="Reacts only to confirmed sweeps, BOS, ChoCH and pinbars. Zero predictive forecasting.">
+                    REACTIVE
+                  </button>
+                  <button type="button" class="mode-pill" data-mode="predictive" title="Quant indicator models: Momentum lookback, RSI reversion, 200 SMA regime.">
+                    PREDICTIVE
+                  </button>
+                  <button type="button" class="mode-pill" data-mode="hybrid" title="Macro trend regime + structural entry trigger.">
+                    HYBRID
+                  </button>
+                </div>
+              </div>
+
+              <div class="automation-guardrail-summary">
+                <div class="guardrail-item">
+                  <span class="metric-label">MAX ORDER</span>
+                  <strong id="auto-max-order">$50.00</strong>
+                </div>
+                <div class="guardrail-item">
+                  <span class="metric-label">HARD STOP</span>
+                  <strong id="auto-stop-loss">-2.0%</strong>
+                </div>
+                <div class="guardrail-item">
+                  <span class="metric-label">MIN R:R</span>
+                  <strong id="auto-rr-target">1:2.0</strong>
+                </div>
+                <div class="guardrail-item">
+                  <span class="metric-label">SIGNALS</span>
+                  <strong id="auto-signals-count">0</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="automation-telemetry-bar" id="auto-telemetry-bar">
+              <span class="telemetry-label">LAST EVALUATION:</span>
+              <span id="auto-telemetry-text" class="telemetry-text">Awaiting evaluation... Non-predictive price action framework active.</span>
             </div>
           </div>
 
@@ -214,12 +314,22 @@
           <div class="market-status" id="market-status" aria-live="polite">Load a symbol to fetch current quote and historical OHLCV bars.</div>
           <form id="backtest-form">
             <div class="backtest-controls">
+              <label class="field-control">
+                <span>RESEARCH STRATEGY</span>
+                <select id="backtest-strategy-select">
+                  <option value="momentum" selected>Time-Series Momentum (Predictive)</option>
+                  <option value="price_action">Institutional Price Action (Reactive)</option>
+                  <option value="rsi_reversion">1H RSI Mean Reversion (Predictive)</option>
+                  <option value="fvg_breakout">Fair Value Gap Breakout (Hybrid)</option>
+                  <option value="sma_macro_regime">200-Day SMA Macro Regime (Predictive)</option>
+                </select>
+              </label>
               <label class="field-control data-file-control">
                 <span>PRICE HISTORY <small>OPTIONAL CSV</small></span>
                 <input id="price-file" type="file" accept=".csv,text/csv" />
               </label>
               <label class="field-control">
-                <span>MOMENTUM LOOKBACK</span>
+                <span>LOOKBACK / PIVOT WINDOW</span>
                 <input id="lookback" type="number" min="1" max="500" value="40" required />
               </label>
               <label class="field-control">
@@ -375,9 +485,730 @@
             <span class="response-mark" aria-hidden="true">✳</span>
             <div class="agent-response-content"><span class="response-label">MARKET RESEARCH</span><p id="agent-response-text"></p><div class="optimization-candidates" id="optimization-candidates"></div></div>
           </div>
-          <div class="agent-footnote">Agent requests use the existing server-side Ollama endpoint; returned analysis is not a trade instruction.</div>
+          <div class="agent-footnote">Agent requests use the configured AI provider (Local Ollama or External AI); returned analysis is not a trade instruction.</div>
+        </section>
+
+        <!-- AGENT C: MARKET INTELLIGENCE TERMINAL -->
+        <section class="panel intel-panel" id="intel-panel" aria-labelledby="intel-title" hidden>
+          <div class="section-heading compact-heading intel-heading">
+            <div>
+              <div class="eyebrow">AGENT C SENTINEL <span>·</span> X/TWITTER <span>·</span> DISCORD <span>·</span> NEWS <span>·</span> MACRO CALENDAR</div>
+              <h2 id="intel-title">⚡ Market Intelligence Terminal <span class="heading-amp">(</span>Agent C<span class="heading-amp">)</span></h2>
+            </div>
+            <div class="intel-heading-actions">
+              <span class="engine-badge" id="agent-c-engine-badge"><span class="status-dot"></span>xAI GROK READY</span>
+              <button type="button" class="button button-small" id="btn-refresh-intel">⚡ Refresh Intel</button>
+            </div>
+          </div>
+
+          <!-- TOPLINE MACRO RISK & SENTIMENT BAR -->
+          <div class="intel-macro-banner">
+            <div class="macro-banner-col">
+              <span class="intel-lbl">POLARIZED SENTIMENT INDEX</span>
+              <div class="sentiment-gauge-wrapper">
+                <div class="sentiment-score-badge" id="intel-sentiment-badge">+0.42 BULLISH</div>
+                <div class="sentiment-meter-bar">
+                  <div class="sentiment-meter-fill" id="intel-sentiment-fill" style="width: 71%;"></div>
+                </div>
+                <div class="sentiment-breakdown-labels">
+                  <span id="intel-bull-pct">Bulls: 75%</span>
+                  <span id="intel-bear-pct">Bears: 25%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="macro-banner-col">
+              <span class="intel-lbl">CHATTER VELOCITY</span>
+              <div class="velocity-metric">
+                <strong id="intel-velocity">1,420</strong> <span class="metric-unit">msgs/hr</span>
+              </div>
+              <div class="velocity-sub" id="intel-velocity-sub">Twitter/X &amp; Discord Streams Active</div>
+            </div>
+
+            <div class="macro-banner-col">
+              <span class="intel-lbl">TIER-1 MACRO EVENT RISK</span>
+              <div class="event-risk-badge-box">
+                <span class="event-risk-pill" id="intel-event-risk-pill">LOW RISK</span>
+                <span class="event-countdown" id="intel-event-countdown">Next: Core CPI in 3h 15m</span>
+              </div>
+              <div class="risk-sentinel-status" id="intel-risk-sentinel-status">
+                <span class="sentinel-dot"></span>RiskSentinel: CLEAR TO TRADE
+              </div>
+            </div>
+
+            <div class="macro-banner-col symbol-select-col">
+              <span class="intel-lbl">FOCUS ASSET</span>
+              <div class="intel-symbol-selector">
+                <button type="button" class="intel-sym-btn is-active" data-sym="ETH">ETH</button>
+                <button type="button" class="intel-sym-btn" data-sym="BTC">BTC</button>
+                <button type="button" class="intel-sym-btn" data-sym="SPY">SPY</button>
+                <button type="button" class="intel-sym-btn" data-sym="NVDA">NVDA</button>
+                <button type="button" class="intel-sym-btn" data-sym="TSLA">TSLA</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MID GRID: SOCIAL CHATS & NEWS FEEDS -->
+          <div class="intel-grid">
+            <!-- 1. TRADE CHATS STREAM (TWITTER & DISCORD) -->
+            <div class="intel-card">
+              <div class="intel-card-header">
+                <div>
+                  <span class="eyebrow">COMMUNITY &amp; WHALE FLOWS</span>
+                  <h3>Trade Chats &amp; Social Streams</h3>
+                </div>
+                <span class="intel-channel-badge">𝕏 Twitter + 💬 Discord</span>
+              </div>
+              <div class="chat-stream-container" id="chat-stream-container">
+                <!-- Dynamically populated -->
+              </div>
+              <div class="whale-alerts-box" id="whale-alerts-box">
+                <!-- Whale alerts -->
+              </div>
+            </div>
+
+            <!-- 2. BREAKING MARKET NEWS -->
+            <div class="intel-card">
+              <div class="intel-card-header">
+                <div>
+                  <span class="eyebrow">AI-CATEGORIZED FEEDS</span>
+                  <h3>Breaking Financial News</h3>
+                </div>
+                <span class="intel-channel-badge">Curated Wire</span>
+              </div>
+              <div class="news-stream-container" id="news-stream-container">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- 3. ECONOMIC EVENT CALENDAR -->
+            <div class="intel-card">
+              <div class="intel-card-header">
+                <div>
+                  <span class="eyebrow">HIGH-IMPACT RELEASES</span>
+                  <h3>Economic Event Calendar</h3>
+                </div>
+                <span class="intel-channel-badge">Tier-1 Macro</span>
+              </div>
+              <div class="calendar-table-wrapper">
+                <table class="calendar-table">
+                  <thead>
+                    <tr>
+                      <th>Event</th>
+                      <th>Time (UTC)</th>
+                      <th>Forecast</th>
+                      <th>Previous</th>
+                      <th>Impact</th>
+                    </tr>
+                  </thead>
+                  <tbody id="calendar-table-body">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="calendar-advisory-box" id="calendar-advisory-box">
+                <span class="advisory-icon">ℹ</span>
+                <span id="calendar-advisory-text">CLEAR: No imminent high-impact macro data releases.</span>
+              </div>
+            </div>
+
+            <!-- 4. SHARES & COMPANY VALUATION -->
+            <div class="intel-card">
+              <div class="intel-card-header">
+                <div>
+                  <span class="eyebrow">EQUITIES &amp; PROTOCOLS</span>
+                  <h3>Company Fundamentals &amp; Valuation</h3>
+                </div>
+                <span class="intel-channel-badge" id="company-symbol-badge">ETH</span>
+              </div>
+              <div class="company-fundamentals-grid" id="company-fundamentals-grid">
+                <div class="fundamental-item">
+                  <span class="fund-label">ASSET / COMPANY</span>
+                  <strong class="fund-value" id="fund-name">—</strong>
+                </div>
+                <div class="fundamental-item">
+                  <span class="fund-label">SECTOR</span>
+                  <strong class="fund-value" id="fund-sector">—</strong>
+                </div>
+                <div class="fundamental-item">
+                  <span class="fund-label">MARKET CAP</span>
+                  <strong class="fund-value" id="fund-mcap">—</strong>
+                </div>
+                <div class="fundamental-item">
+                  <span class="fund-label">P/E RATIO (TTM)</span>
+                  <strong class="fund-value" id="fund-pe">—</strong>
+                </div>
+                <div class="fundamental-item">
+                  <span class="fund-label">FORWARD P/E</span>
+                  <strong class="fund-value" id="fund-fpe">—</strong>
+                </div>
+                <div class="fundamental-item">
+                  <span class="fund-label">EPS (TTM)</span>
+                  <strong class="fund-value" id="fund-eps">—</strong>
+                </div>
+                <div class="fundamental-item">
+                  <span class="fund-label">BETA</span>
+                  <strong class="fund-value" id="fund-beta">—</strong>
+                </div>
+                <div class="fundamental-item">
+                  <span class="fund-label">52-WEEK RANGE</span>
+                  <strong class="fund-value" id="fund-range">—</strong>
+                </div>
+                <div class="fundamental-item">
+                  <span class="fund-label">DIVIDEND / STAKING YIELD</span>
+                  <strong class="fund-value" id="fund-div">—</strong>
+                </div>
+                <div class="fundamental-item">
+                  <span class="fund-label">NEXT EARNINGS / EVENT</span>
+                  <strong class="fund-value" id="fund-earnings">—</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INTERACTIVE AGENT C GROK QUERY BOX -->
+          <div class="agent-c-query-section">
+            <div class="section-heading compact-heading">
+              <div>
+                <div class="eyebrow">INTERACTIVE REASONING <span>·</span> xAI GROK &amp; MULTI-PROVIDER</div>
+                <h3>Ask Agent C Sentinel</h3>
+              </div>
+            </div>
+            <form id="agent-c-form" class="agent-form">
+              <label class="sr-only" for="agent-c-query-input">Ask Agent C about sentiment, macro risks, or fundamentals</label>
+              <textarea id="agent-c-query-input" rows="2" placeholder="Ask Agent C (Grok) to synthesize social trade chats, analyze FOMC risk, or summarize valuation..."></textarea>
+              <div class="agent-actions">
+                <div class="prompt-list" aria-label="Example Agent C prompts">
+                  <button class="prompt-button agent-c-prompt-btn" type="button" data-prompt="Analyze Twitter &amp; Discord sentiment on ETH. Are whales accumulating or distributing?">Analyze ETH Sentiment</button>
+                  <button class="prompt-button agent-c-prompt-btn" type="button" data-prompt="Summarize today's CPI &amp; FOMC event risk and recommend positioning adjustments.">Macro Event Risk</button>
+                  <button class="prompt-button agent-c-prompt-btn" type="button" data-prompt="Compare NVDA valuation multiples (P/E, Forward P/E) against growth consensus.">NVDA Valuation</button>
+                  <button class="prompt-button agent-c-prompt-btn" type="button" data-prompt="Scan for unusual whale liquidity sweeps and CME gap targets across crypto markets.">Whale &amp; CME Gaps</button>
+                </div>
+                <button class="button button-analyze" id="btn-agent-c-query" type="submit"><span aria-hidden="true">⚡</span> Consult Agent C</button>
+              </div>
+            </form>
+            <div class="agent-response" id="agent-c-response" aria-live="polite" hidden>
+              <span class="response-mark" aria-hidden="true">⚡</span>
+              <div class="agent-response-content">
+                <div class="agent-c-response-header">
+                  <span class="response-label" id="agent-c-response-label">AGENT C (GROK) BRIEFING</span>
+                  <span class="agent-c-response-meta" id="agent-c-response-meta"></span>
+                </div>
+                <div id="agent-c-response-text" class="agent-c-response-text"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ADMIN & CONTROL PANEL -->
+        <section class="panel admin-panel" id="admin-panel" aria-labelledby="admin-title" hidden>
+          <div class="section-heading compact-heading admin-heading">
+            <div>
+              <div class="eyebrow">SYSTEM CONFIGURATION <span>·</span> CREDENTIAL VAULT &amp; AGENT MESH</div>
+              <h2 id="admin-title">Admin &amp; Control Center</h2>
+            </div>
+            <div class="admin-heading-actions">
+              <span class="engine-badge"><span class="status-dot"></span>LOCAL &amp; CLOUD READY</span>
+            </div>
+          </div>
+
+          <div class="admin-grid">
+            <!-- 1. LIVE API MONITOR -->
+            <div class="admin-card api-monitor-card">
+              <div class="admin-card-header">
+                <div>
+                  <span class="eyebrow">DIAGNOSTICS <span>·</span> REAL-TIME</span>
+                  <h3>API Connections &amp; Latency</h3>
+                </div>
+                <button type="button" class="button button-small" id="btn-test-all-apis">⚡ Test All Connections</button>
+              </div>
+              <div class="api-monitor-grid" id="api-monitor-grid">
+                <div class="api-card" data-service="t212">
+                  <div class="api-card-top"><span class="api-name">Trading 212</span><span class="api-dot" id="dot-t212"></span></div>
+                  <div class="api-metric-row"><span class="api-lbl">ENV</span><strong id="env-t212">DEMO / LIVE</strong></div>
+                  <div class="api-metric-row"><span class="api-lbl">STATUS</span><span id="stat-t212">Checking...</span></div>
+                  <div class="api-metric-row"><span class="api-lbl">LATENCY</span><strong id="lat-t212">—</strong></div>
+                </div>
+
+                <div class="api-card" data-service="etoro">
+                  <div class="api-card-top"><span class="api-name">eToro Quant Hub</span><span class="api-dot" id="dot-etoro"></span></div>
+                  <div class="api-metric-row"><span class="api-lbl">ENV</span><strong id="env-etoro">DEMO / LIVE</strong></div>
+                  <div class="api-metric-row"><span class="api-lbl">STATUS</span><span id="stat-etoro">Checking...</span></div>
+                  <div class="api-metric-row"><span class="api-lbl">LATENCY</span><strong id="lat-etoro">—</strong></div>
+                </div>
+
+                <div class="api-card" data-service="binance">
+                  <div class="api-card-top"><span class="api-name">Binance Spot</span><span class="api-dot" id="dot-binance"></span></div>
+                  <div class="api-metric-row"><span class="api-lbl">ENDPOINT</span><strong>api.binance.com</strong></div>
+                  <div class="api-metric-row"><span class="api-lbl">STATUS</span><span id="stat-binance">Checking...</span></div>
+                  <div class="api-metric-row"><span class="api-lbl">LATENCY</span><strong id="lat-binance">—</strong></div>
+                </div>
+
+                <div class="api-card" data-service="kraken">
+                  <div class="api-card-top"><span class="api-name">Kraken Spot</span><span class="api-dot" id="dot-kraken"></span></div>
+                  <div class="api-metric-row"><span class="api-lbl">ENDPOINT</span><strong>api.kraken.com</strong></div>
+                  <div class="api-metric-row"><span class="api-lbl">STATUS</span><span id="stat-kraken">Checking...</span></div>
+                  <div class="api-metric-row"><span class="api-lbl">LATENCY</span><strong id="lat-kraken">—</strong></div>
+                </div>
+
+                <div class="api-card" data-service="yahoo">
+                  <div class="api-card-top"><span class="api-name">Yahoo Finance</span><span class="api-dot" id="dot-yahoo"></span></div>
+                  <div class="api-metric-row"><span class="api-lbl">TYPE</span><strong>Equities Data</strong></div>
+                  <div class="api-metric-row"><span class="api-lbl">STATUS</span><span id="stat-yahoo">Checking...</span></div>
+                  <div class="api-metric-row"><span class="api-lbl">LATENCY</span><strong id="lat-yahoo">—</strong></div>
+                </div>
+
+                <div class="api-card" data-service="ollama">
+                  <div class="api-card-top"><span class="api-name">Local Ollama</span><span class="api-dot" id="dot-ollama"></span></div>
+                  <div class="api-metric-row"><span class="api-lbl">HOST</span><strong id="host-ollama">10.10.10.15:11434</strong></div>
+                  <div class="api-metric-row"><span class="api-lbl">STATUS</span><span id="stat-ollama">Checking...</span></div>
+                  <div class="api-metric-row"><span class="api-lbl">LATENCY</span><strong id="lat-ollama">—</strong></div>
+                </div>
+
+                <div class="api-card" data-service="external_ai">
+                  <div class="api-card-top"><span class="api-name">External AI Agent</span><span class="api-dot" id="dot-extai"></span></div>
+                  <div class="api-metric-row"><span class="api-lbl">PROVIDER</span><strong id="prov-extai">OpenRouter / OpenAI</strong></div>
+                  <div class="api-metric-row"><span class="api-lbl">STATUS</span><span id="stat-extai">Configured / Standby</span></div>
+                  <div class="api-metric-row"><span class="api-lbl">LATENCY</span><strong id="lat-extai">—</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. SECURE API KEY VAULT -->
+            <div class="admin-card key-vault-card">
+              <div class="admin-card-header">
+                <div>
+                  <span class="eyebrow">CREDENTIALS <span>·</span> RULE-1 MASKED</span>
+                  <h3>Broker API Keys &amp; Secrets</h3>
+                </div>
+                <span class="vault-safe-badge"><span class="status-dot"></span>SECURE VAULT</span>
+              </div>
+              <p class="vault-desc">Paste broker API keys below. All credentials remain encrypted or stored in <code>.env</code> and are never leaked to the client.</p>
+
+              <form id="form-admin-keys" class="keys-form">
+                <div class="key-group">
+                  <div class="key-group-title">Trading 212 API (Invest Account)</div>
+                  <div class="key-fields">
+                    <label class="field-control">
+                      <span>API KEY</span>
+                      <div class="input-with-button">
+                        <input id="key-t212-val" type="password" placeholder="Paste T212 API Key..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="key-t212-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-t212-key">Current: Not configured</small>
+                    </label>
+                    <label class="field-control">
+                      <span>API SECRET</span>
+                      <div class="input-with-button">
+                        <input id="sec-t212-val" type="password" placeholder="Paste T212 API Secret..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="sec-t212-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-t212-sec">Current: Not configured</small>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="key-group">
+                  <div class="key-group-title">eToro Public API</div>
+                  <div class="key-fields">
+                    <label class="field-control">
+                      <span>API KEY (X-API-KEY)</span>
+                      <div class="input-with-button">
+                        <input id="key-etoro-val" type="password" placeholder="Paste eToro API Key..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="key-etoro-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-etoro-key">Current: Not configured</small>
+                    </label>
+                    <label class="field-control">
+                      <span>USER KEY (X-USER-KEY)</span>
+                      <div class="input-with-button">
+                        <input id="sec-etoro-val" type="password" placeholder="Paste eToro User Key..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="sec-etoro-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-etoro-sec">Current: Not configured</small>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="key-group">
+                  <div class="key-group-title">Binance Spot API</div>
+                  <div class="key-fields">
+                    <label class="field-control">
+                      <span>BINANCE API KEY</span>
+                      <div class="input-with-button">
+                        <input id="key-binance-val" type="password" placeholder="Paste Binance API Key..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="key-binance-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-binance-key">Current: Not configured</small>
+                    </label>
+                    <label class="field-control">
+                      <span>BINANCE API SECRET</span>
+                      <div class="input-with-button">
+                        <input id="sec-binance-val" type="password" placeholder="Paste Binance API Secret..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="sec-binance-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-binance-sec">Current: Not configured</small>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="key-group">
+                  <div class="key-group-title">Kraken Spot API</div>
+                  <div class="key-fields">
+                    <label class="field-control">
+                      <span>KRAKEN API KEY</span>
+                      <div class="input-with-button">
+                        <input id="key-kraken-val" type="password" placeholder="Paste Kraken API Key..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="key-kraken-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-kraken-key">Current: Not configured</small>
+                    </label>
+                    <label class="field-control">
+                      <span>KRAKEN PRIVATE SECRET</span>
+                      <div class="input-with-button">
+                        <input id="sec-kraken-val" type="password" placeholder="Paste Kraken API Secret..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="sec-kraken-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-kraken-sec">Current: Not configured</small>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="key-group">
+                  <div class="key-group-title">Agent C · xAI Grok &amp; Discord Stream Keys</div>
+                  <div class="key-fields">
+                    <label class="field-control">
+                      <span>XAI GROK API KEY</span>
+                      <div class="input-with-button">
+                        <input id="key-xai-val" type="password" placeholder="Paste xAI Grok API Key..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="key-xai-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-xai-key">Current: Not configured</small>
+                    </label>
+                    <label class="field-control">
+                      <span>DISCORD WEBHOOK / CHANNEL</span>
+                      <div class="input-with-button">
+                        <input id="sec-discord-val" type="password" placeholder="https://discord.com/api/webhooks/..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="sec-discord-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-discord-sec">Current: Not configured</small>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="vault-actions">
+
+                  <span id="save-keys-status" class="status-msg"></span>
+                  <button type="submit" class="button button-primary" id="btn-save-keys">Save &amp; Apply Credentials</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- 3. LOCAL AGENTS TELEMETRY -->
+            <div class="admin-card local-agents-card">
+              <div class="admin-card-header">
+                <div>
+                  <span class="eyebrow">AGENT MESH <span>·</span> ACTIVE PROCESSES</span>
+                  <h3>Local Agents &amp; Sub-Pipelines</h3>
+                </div>
+                <button type="button" class="button button-small" id="btn-refresh-agents">↻ Refresh Status</button>
+              </div>
+
+              <div class="agents-list" id="admin-agents-list">
+                <!-- Agent A -->
+                <div class="agent-item-card">
+                  <div class="agent-item-header">
+                    <div class="agent-title-block">
+                      <span class="status-dot status-dot-online"></span>
+                      <strong>Agent A · Market Dispatcher</strong>
+                      <span class="agent-model-pill">llama3.1:8b</span>
+                    </div>
+                    <span class="agent-state-badge">ONLINE</span>
+                  </div>
+                  <p class="agent-desc">Ingests real-time Binance orderbook depth, extracts OHLCV bars, and computes RSI/FVG imbalances.</p>
+                  <div class="agent-tools-row">
+                    <span class="tool-tag">get_binance_metrics</span>
+                    <span class="tool-tag">get_price_action_metrics</span>
+                    <span class="tool-tag">get_liquidity_clusters</span>
+                    <span class="tool-tag">get_broker_risk_envelope</span>
+                  </div>
+                </div>
+
+                <!-- Agent B -->
+                <div class="agent-item-card">
+                  <div class="agent-item-header">
+                    <div class="agent-title-block">
+                      <span class="status-dot status-dot-online"></span>
+                      <strong>Agent B · DeepSeek-R1 Reasoner</strong>
+                      <span class="agent-model-pill">deepseek-r1:7b</span>
+                    </div>
+                    <span class="agent-state-badge">ONLINE</span>
+                  </div>
+                  <p class="agent-desc">Executes non-predictive institutional Price Action reasoning, confirms structural sweeps, and calculates 1:2 R:R targets.</p>
+                  <div class="agent-tools-row">
+                    <span class="tool-tag">structural_invalidation</span>
+                    <span class="tool-tag">half_kelly_allocation</span>
+                    <span class="tool-tag">non_predictive_mandate</span>
+                  </div>
+                </div>
+
+                <!-- Autonomous Engine -->
+                <div class="agent-item-card">
+                  <div class="agent-item-header">
+                    <div class="agent-title-block">
+                      <span class="status-dot" id="engine-dot"></span>
+                      <strong>Autonomous Orchestrator</strong>
+                      <span class="agent-model-pill">engine.py</span>
+                    </div>
+                    <span class="agent-state-badge" id="engine-state-badge">STANDBY</span>
+                  </div>
+                  <p class="agent-desc">Multi-asset event loop scanning ETH, BTC, SOL, AVAX every 60s for Price Action signals and evaluates against RiskSentinel.</p>
+                  <div class="agent-tools-row">
+                    <span class="tool-tag">ETH</span>
+                    <span class="tool-tag">BTC</span>
+                    <span class="tool-tag">SOL</span>
+                    <span class="tool-tag">AVAX</span>
+                    <span class="tool-tag">60s Scan Loop</span>
+                  </div>
+                </div>
+
+                <!-- RiskSentinel -->
+                <div class="agent-item-card">
+                  <div class="agent-item-header">
+                    <div class="agent-title-block">
+                      <span class="status-dot status-dot-armed"></span>
+                      <strong>RiskSentinel Guardrail</strong>
+                      <span class="agent-model-pill">Capital Sentinel</span>
+                    </div>
+                    <span class="agent-state-badge agent-state-armed">ARMED</span>
+                  </div>
+                  <p class="agent-desc">Capital preservation engine enforcing hard stops, daily circuit breakers, and position count limits.</p>
+                  <div class="agent-tools-row">
+                    <span class="tool-tag">2.0% Stop Loss</span>
+                    <span class="tool-tag">3.0% Circuit Breaker</span>
+                    <span class="tool-tag">$50 Max Order</span>
+                    <span class="tool-tag">5 Max Positions</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. EXTERNAL AI AGENT CONNECTIVITY -->
+            <div class="admin-card external-ai-card">
+              <div class="admin-card-header">
+                <div>
+                  <span class="eyebrow">INTELLIGENCE <span>·</span> MULTI-PROVIDER</span>
+                  <h3>External AI Agent Integration</h3>
+                </div>
+                <span class="vault-safe-badge"><span class="status-dot"></span>OPENAI COMPATIBLE</span>
+              </div>
+              <p class="vault-desc">Connect external LLM providers (OpenRouter, DeepSeek Cloud, OpenAI, Groq) or fall back to local Ollama seamlessly.</p>
+
+              <form id="form-ai-config" class="ai-config-form">
+                <div class="ai-controls-grid">
+                  <label class="field-control">
+                    <span>AI PROVIDER</span>
+                    <select id="ai-provider-select">
+                      <option value="ollama">Local Ollama (DeepSeek-R1 / Llama 3.1)</option>
+                      <option value="external" selected>External AI Provider (OpenRouter / DeepSeek / OpenAI)</option>
+                    </select>
+                  </label>
+
+                  <label class="field-control">
+                    <span>PROVIDER BASE URL</span>
+                    <input id="ai-base-url" type="url" value="https://openrouter.ai/api/v1" placeholder="https://openrouter.ai/api/v1" />
+                  </label>
+
+                  <label class="field-control">
+                    <span>MODEL IDENTIFIER</span>
+                    <input id="ai-model-name" type="text" value="deepseek/deepseek-r1" placeholder="e.g. deepseek/deepseek-r1 or gpt-4o" />
+                  </label>
+
+                  <label class="field-control">
+                    <span>API KEY (BEARER TOKEN)</span>
+                    <div class="input-with-button">
+                      <input id="ai-api-key" type="password" placeholder="sk-or-v1-... or sk-..." autocomplete="new-password" />
+                      <button type="button" class="btn-toggle-vis" data-target="ai-api-key" title="Toggle visibility">👁</button>
+                    </div>
+                    <small class="key-hint" id="hint-ai-key">Current: Not configured</small>
+                  </label>
+                </div>
+
+                <div class="ai-checkbox-wrap">
+                  <label class="checkbox-control">
+                    <input id="ai-fallback-local" type="checkbox" checked />
+                    <span>Automatically fallback to local Ollama (10.10.10.15:11434) if external provider is offline or times out</span>
+                  </label>
+                </div>
+
+                <div class="ai-actions">
+                  <div class="ai-status-row">
+                    <button type="button" class="button button-small" id="btn-test-ai">⚡ Test AI Connection</button>
+                    <span id="ai-test-status" class="status-msg"></span>
+                  </div>
+                  <button type="submit" class="button button-primary" id="btn-save-ai">Save AI Configuration</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- 5. AI ORCHESTRATOR (OLLAMA / OPEN-WEBUI) -->
+            <div class="admin-card orchestrator-card">
+              <div class="admin-card-header">
+                <div>
+                  <span class="eyebrow">EXECUTIVE BRAIN <span>·</span> OPEN-WEBUI &amp; OLLAMA</span>
+                  <h3>AI Quantitative Orchestrator</h3>
+                </div>
+                <span class="vault-safe-badge"><span class="status-dot"></span>TOOL GATEWAY READY</span>
+              </div>
+              <p class="vault-desc">
+                Use your local <strong>Ollama</strong> or <strong>Open-WebUI</strong> as the central executive orchestrator.
+                Any model in Open-WebUI can invoke <code>trader-core</code> tools, or <code>trader-core</code> can query the orchestrator for multi-agent synthesis.
+              </p>
+
+              <form id="form-orchestrator-config" class="orchestrator-form">
+                <div class="ai-controls-grid">
+                  <label class="field-control">
+                    <span>ORCHESTRATOR TYPE</span>
+                    <select id="orch-type-select">
+                      <option value="ollama" selected>Ollama Native (http://10.10.10.15:11434)</option>
+                      <option value="open_webui">Open-WebUI Hub (http://192.168.2.15:8080)</option>
+                    </select>
+                  </label>
+
+                  <label class="field-control">
+                    <span>ORCHESTRATOR BASE URL</span>
+                    <input id="orch-base-url" type="url" value="http://10.10.10.15:11434" placeholder="http://10.10.10.15:11434 or http://192.168.2.15:8080" />
+                  </label>
+
+                  <label class="field-control">
+                    <span>MODEL NAME</span>
+                    <input id="orch-model-name" type="text" value="llama3.1:8b" placeholder="e.g. llama3.1:8b, qwen2.5:14b, deepseek-r1:7b" />
+                  </label>
+
+                  <label class="field-control">
+                    <span>OPEN-WEBUI API KEY (IF REQUIRED)</span>
+                    <div class="input-with-button">
+                      <input id="orch-api-key" type="password" placeholder="Bearer token for Open-WebUI..." autocomplete="new-password" />
+                      <button type="button" class="btn-toggle-vis" data-target="orch-api-key" title="Toggle visibility">👁</button>
+                    </div>
+                    <small class="key-hint" id="hint-orch-key">Optional for local Ollama</small>
+                  </label>
+                </div>
+
+                <div class="orchestrator-actions-bar">
+                  <div class="ai-status-row">
+                    <button type="button" class="button button-small" id="btn-test-orchestrator">⚡ Test Orchestrator</button>
+                    <span id="orch-test-status" class="status-msg"></span>
+                  </div>
+                  <div class="orch-right-actions">
+                    <button type="button" class="button button-small" id="btn-copy-owui-tool" title="Copy Open-WebUI custom Tool Python script">📋 Copy Open-WebUI Tool Script</button>
+                    <button type="submit" class="button button-primary" id="btn-save-orch">Save Orchestrator Config</button>
+                  </div>
+                </div>
+              </form>
+
+              <!-- OPEN-WEBUI WORKSPACE & RAG MANAGER -->
+              <div class="owui-workspace-manager">
+                <div class="owui-box-header">
+                  <div>
+                    <span class="eyebrow">AUTOMATED WORKSPACE PROVISIONING</span>
+                    <h4 class="owui-title">🚀 Open-WebUI Workspace &amp; RAG Manager</h4>
+                  </div>
+                  <span class="vault-safe-badge"><span class="status-dot"></span>API SYNC READY</span>
+                </div>
+                <p class="vault-desc">
+                  Programmatically configure Open-WebUI workspace (<code>http://192.168.2.15:8080</code>) with 1 click:
+                  auto-installs the <code>trader_core_tools</code> plugin, uploads the 4 Quantitative RAG Playbooks to Knowledge Base,
+                  and registers dual model profiles (Fast Dispatcher &amp; Deep R1 Reasoner) with pre-configured quick prompts.
+                </p>
+
+                <div class="ai-controls-grid">
+                  <label class="field-control">
+                    <span>FAST DISPATCHER BASE MODEL</span>
+                    <select id="owui-fast-base-model">
+                      <option value="llama3.1:8b" selected>Meta Llama 3.1 8B (llama3.1:8b)</option>
+                      <option value="qwen2.5:7b">Qwen 2.5 7B (qwen2.5:7b)</option>
+                      <option value="qwen2.5:14b">Qwen 2.5 14B (qwen2.5:14b)</option>
+                      <option value="mistral-nemo:12b">Mistral NeMo 12B (mistral-nemo:12b)</option>
+                    </select>
+                  </label>
+
+                  <label class="field-control">
+                    <span>DEEP REASONER BASE MODEL</span>
+                    <select id="owui-deep-base-model">
+                      <option value="deepseek-r1:7b">DeepSeek-R1 7B (deepseek-r1:7b)</option>
+                      <option value="deepseek-r1:14b" selected>DeepSeek-R1 14B (deepseek-r1:14b)</option>
+                      <option value="deepseek-r1:32b">DeepSeek-R1 32B (deepseek-r1:32b)</option>
+                      <option value="qwen2.5:32b">Qwen 2.5 32B (qwen2.5:32b)</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="orchestrator-actions-bar">
+                  <div class="ai-status-row">
+                    <button type="button" class="button button-primary" id="btn-sync-openwebui">
+                      <span>🚀 1-Click Auto-Provision Open-WebUI</span>
+                    </button>
+                    <span id="owui-sync-quick-status" class="status-msg"></span>
+                  </div>
+                  <div class="orch-right-actions">
+                    <button type="button" class="button button-small" id="btn-inspect-openwebui">
+                      <span>🔍 Inspect Workspace</span>
+                    </button>
+                    <button type="button" class="button button-small" id="btn-preview-rag">
+                      <span>📖 Preview 4 RAG Playbooks</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Live Sync Status / Log Box -->
+                <div id="owui-sync-box" class="owui-sync-box" hidden>
+                  <div class="owui-sync-header">
+                    <span id="owui-sync-badge" class="sync-badge">READY</span>
+                    <span id="owui-sync-title" class="sync-title">Workspace Provisioning Progress</span>
+                  </div>
+                  <pre id="owui-sync-log" class="owui-sync-log"></pre>
+                </div>
+              </div>
+
+              <!-- OPEN-WEBUI QUICK INTEGRATION INSTRUCTIONS -->
+              <div class="owui-integration-box">
+                <div class="owui-box-title">
+                  <span class="owui-icon">🔌</span>
+                  <strong>Quick Connect to Open-WebUI (Manual Fallback):</strong>
+                </div>
+                <ol class="owui-steps">
+                  <li>In Open-WebUI (<code>http://192.168.2.15:8080</code>), go to <strong>Workspace &gt; Tools &gt; Create New Tool (+)</strong>.</li>
+                  <li>Click <strong>"📋 Copy Open-WebUI Tool Script"</strong> above and paste it into the code editor.</li>
+                  <li>Ensure <code>trader_core_url</code> in Valves points to your <code>trader-core</code> IP (e.g. <code>http://10.10.10.1:5000</code>).</li>
+                  <li>Enable the tool on your favorite chat model and type: <em>"Analyze ETH price action and summarize today's economic calendar"</em>.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
+
+      <!-- REAL CAPITAL CONFIRMATION MODAL -->
+      <div class="modal-backdrop" id="real-mode-modal" hidden>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+          <div class="modal-header">
+            <span class="modal-warning-icon" aria-hidden="true">⚠️</span>
+            <h3 id="modal-title">SWITCH TO REAL CAPITAL (LIVE)</h3>
+          </div>
+          <p class="modal-body">
+            You are about to switch the workstation to <strong>REAL CAPITAL (LIVE)</strong> mode.
+            Live broker endpoints will be queried, and any buy/sell signal automations will place real orders.
+          </p>
+          <div class="modal-risk-note">
+            RiskSentinel guardrails remain strictly <strong>ARMED</strong> (2.0% stop-loss, 3.0% daily circuit breaker, $50 order limit).
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="button button-modal-cancel" id="btn-modal-cancel">Cancel (Stay in Demo)</button>
+            <button type="button" class="button button-modal-confirm" id="btn-modal-confirm">Activate Real Capital</button>
+          </div>
+        </div>
+      </div>
 
       <footer class="workspace-footer">
         <span><span class="footer-mark">MM</span> MONEYMAKINGMACHINE <span class="footer-separator">/</span> RESEARCH TERMINAL</span>

@@ -48,4 +48,5 @@ class OrderEvent:
     price: Optional[float] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
