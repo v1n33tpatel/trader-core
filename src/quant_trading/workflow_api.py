@@ -185,6 +185,14 @@ def workflow_recommend():
         setup_name = "Institutional Price Action Break of Structure"
         engine_note = "Structural pinbar rejection confirming key swing level."
 
+    # Allow explicit strategy override from request payload (e.g. macd_risk)
+    req_strat = str(payload.get("strategy", "")).lower()
+    if req_strat in STRATEGY_CATALOG.get(strat_catalog_key, {}):
+        matched_strat_id = req_strat
+        if matched_strat_id == "macd_risk":
+            setup_name = f"MACD Trend & Volatility Sentinel ({'Bullish Golden' if is_bullish else 'Bearish Death'} Cross)"
+            engine_note = "MACD momentum crossover with 200 EMA macro regime filter and ATR volatility stop."
+
     # 4. Invalidation & Take Profit Derivation (Guaranteed >= 1:2.0 R:R)
     rr_multiplier = 2.2
     if is_bullish:
@@ -265,6 +273,7 @@ def workflow_recommend():
             "strategy_name": strategy_name,
             "category": strat_catalog_key,
             "pipeline_type": execution_pipeline,
+            "available_strategies": list(STRATEGY_CATALOG.get(strat_catalog_key, {}).keys()),
         },
         "step_6_parameters": {
             "entry_price": entry_price,

@@ -86,10 +86,10 @@
       </header>
 
       <nav class="broker-nav" aria-label="Broker workspaces" role="tablist">
-        <button class="broker-tab is-active" id="tab-t212" type="button" role="tab" aria-selected="true" data-broker="t212">Trading 212 <span>(Invest)</span></button>
+        <button class="broker-tab is-active" id="tab-t212" type="button" role="tab" aria-selected="true" data-broker="t212">Trading 212 <span>(Invest &amp; ISA)</span></button>
         <button class="broker-tab" id="tab-etoro" type="button" role="tab" aria-selected="false" data-broker="etoro">eToro Quant Hub</button>
         <button class="broker-tab" id="tab-binance" type="button" role="tab" aria-selected="false" data-broker="binance">Binance Spot</button>
-        <button class="broker-tab" id="tab-kraken" type="button" role="tab" aria-selected="false" data-broker="kraken">Kraken Spot</button>
+        <button class="broker-tab" id="tab-kraken" type="button" role="tab" aria-selected="false" data-broker="kraken">Kraken Crypto</button>
         <button class="broker-tab" id="tab-ctrader" type="button" role="tab" aria-selected="false" data-broker="ctrader">cTrader (Forex)</button>
         <button class="broker-tab" id="tab-quantai" type="button" role="tab" aria-selected="false" data-broker="quantai">QuantAI</button>
         <button class="broker-tab broker-tab-intel" id="tab-intel" type="button" role="tab" aria-selected="false" data-broker="intel">⚡ Market Intel (Agent C)</button>
@@ -821,8 +821,54 @@
               <div class="eyebrow">INSTRUMENT FINDER <span>·</span> BROKER API</div>
               <h2 id="search-title">Search Stocks <span class="heading-amp">&amp;</span> ETFs</h2>
             </div>
-            <span class="catalog-count" id="catalog-count">ON REQUEST</span>
+            <span class="catalog-count" id="catalog-count">14,200+ ASSETS</span>
           </div>
+
+          <!-- T212 5-PILLAR & ETF FACET FILTER CONTROLS -->
+          <div class="t212-pillar-controls" id="t212-pillar-controls">
+            <div class="pillar-label-row">
+              <span class="pillar-row-title">INVESTMENT PILLARS (14,200+ ASSETS):</span>
+              <span class="pillar-stats" id="t212-pillar-stats">Traditional · Commission-Free · Fractional from £1</span>
+            </div>
+            <div class="pillar-buttons" id="t212-pillar-buttons">
+              <button type="button" class="pillar-btn is-active" data-pillar="ALL">🌐 All (14.2k+)</button>
+              <button type="button" class="pillar-btn" data-pillar="STOCKS">📈 Global Stocks (9k+)</button>
+              <button type="button" class="pillar-btn" data-pillar="ETFS">🥧 ETFs (5k+)</button>
+              <button type="button" class="pillar-btn" data-pillar="REITS">🏢 REITs &amp; Trusts (200)</button>
+              <button type="button" class="pillar-btn" data-pillar="ETCS">🥇 ETCs (Commodities)</button>
+              <button type="button" class="pillar-btn" data-pillar="CRYPTO_ETNS">⚡ Crypto ETNs (LSE)</button>
+            </div>
+
+            <!-- ETF SMART FACET FILTERS -->
+            <div class="etf-facets-row" id="t212-etf-facets">
+              <span class="facet-label">ETF TYPE / DIVIDENDS:</span>
+              <div class="facet-pill-group">
+                <button type="button" class="facet-pill is-active" data-etf-type="ALL">All ETFs</button>
+                <button type="button" class="facet-pill" data-etf-type="DIVIDEND_DIST">💰 Dividend Paying (Dist)</button>
+                <button type="button" class="facet-pill" data-etf-type="ACCUMULATING">🔄 Accumulating (Acc)</button>
+                <button type="button" class="facet-pill" data-etf-type="GLOBAL_INDICES">🌐 Global Indices</button>
+                <button type="button" class="facet-pill" data-etf-type="SECTORS_THEMES">🚀 Sectors &amp; Tech</button>
+                <button type="button" class="facet-pill" data-etf-type="BONDS">🏛 Fixed Income / Bonds</button>
+                <button type="button" class="facet-pill facet-pill-gbx" id="btn-facet-native-gbx" data-native-only="false">⭐ Native GBX (0% FX Drag)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- KRAKEN QUOTE CURRENCY FILTER CONTROLS -->
+          <div class="kraken-quote-controls" id="kraken-quote-controls" hidden>
+            <div class="pillar-label-row">
+              <span class="pillar-row-title">KRAKEN SPOT CRYPTO · QUOTE PAIRS:</span>
+              <span class="pillar-stats" id="kraken-rate-status">Leaky-Bucket Rate Limit: Protected</span>
+            </div>
+            <div class="pillar-buttons" id="kraken-quote-buttons">
+              <button type="button" class="pillar-btn is-active" data-quote="USD">USD Pairs</button>
+              <button type="button" class="pillar-btn" data-quote="EUR">EUR Pairs</button>
+              <button type="button" class="pillar-btn" data-quote="GBP">GBP Pairs</button>
+              <button type="button" class="pillar-btn" data-quote="USDT">USDT Pairs</button>
+              <button type="button" class="pillar-btn" data-quote="BTC">BTC Pairs</button>
+            </div>
+          </div>
+
           <form class="search-form" id="search-form">
             <label class="sr-only" for="symbol-query">Search by ticker, ISIN, or name</label>
             <span class="search-icon" aria-hidden="true">⌕</span>
@@ -2038,6 +2084,85 @@
         <div class="modal-actions" style="justify-content: space-between;">
           <button type="button" class="button button-danger button-small" id="btn-delete-view-resource">Delete Resource</button>
           <button type="button" class="button button-small" id="btn-dismiss-view-resource">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ETF PIE BREAKDOWN & HISTORICAL RESEARCH MODAL -->
+    <div id="modal-etf-breakdown" class="modal-backdrop" hidden>
+      <div class="modal-card etf-modal-card" role="dialog" aria-modal="true" aria-labelledby="etf-modal-title">
+        <div class="modal-header">
+          <span class="modal-warning-icon">🥧</span>
+          <div style="flex:1;">
+            <div class="res-card-badges" id="etf-modal-badges">
+              <span class="badge badge-strat">UCITS COMPLIANT</span>
+              <span class="badge badge-strat color-green">UK ISA ELIGIBLE</span>
+              <span class="badge badge-strat color-purple" id="etf-modal-fx-badge">0.0% FX DRAG (GBX)</span>
+            </div>
+            <h3 id="etf-modal-title" style="margin:4px 0 0 0;">Vanguard S&P 500 UCITS ETF (Dist) · VUSA.L</h3>
+          </div>
+          <button type="button" class="copilot-btn-close" id="btn-close-etf-modal">✕</button>
+        </div>
+
+        <div class="etf-modal-body">
+          <!-- Key Metrics Telemetry Grid -->
+          <div class="etf-telemetry-hud">
+            <div class="hud-item"><span class="hud-lbl">TER / OCF</span><strong id="etf-hud-ter">0.07%</strong></div>
+            <div class="hud-item"><span class="hud-lbl">DIVIDEND YIELD</span><strong id="etf-hud-yield" class="color-gold">1.25%</strong></div>
+            <div class="hud-item"><span class="hud-lbl">POLICY</span><span id="etf-hud-policy" class="badge badge-strat">Distributing</span></div>
+            <div class="hud-item"><span class="hud-lbl">5Y CAGR</span><strong id="etf-hud-cagr" class="color-green">+15.2%</strong></div>
+            <div class="hud-item"><span class="hud-lbl">MAX DRAWDOWN</span><strong id="etf-hud-mdd" class="color-red">-33.9%</strong></div>
+            <div class="hud-item"><span class="hud-lbl">FUND SIZE (AUM)</span><strong id="etf-hud-aum">£42,500M</strong></div>
+          </div>
+
+          <!-- Pie Visualization & Slices Section -->
+          <div class="etf-pie-layout">
+            <div class="etf-pie-canvas-col">
+              <div class="pie-toggle-tabs">
+                <button type="button" class="pie-toggle-tab is-active" id="btn-toggle-pie-holdings">Top 10 Holdings Pie</button>
+                <button type="button" class="pie-toggle-tab" id="btn-toggle-pie-sectors">Sector Allocation Donut</button>
+              </div>
+              <div class="pie-canvas-box">
+                <canvas id="etf-pie-canvas" width="300" height="300"></canvas>
+              </div>
+            </div>
+
+            <div class="etf-pie-slices-col">
+              <div class="slices-header">
+                <h5 id="pie-slices-heading">TOP 10 UNDERLYING HOLDINGS</h5>
+                <span class="slices-sub" id="pie-slices-sub">Weighted Allocation Slices</span>
+              </div>
+              <div class="pie-slices-list" id="pie-slices-list"></div>
+            </div>
+          </div>
+
+          <!-- Historical Performance & 20-Year Cost Simulator -->
+          <div class="etf-historical-box">
+            <div class="perf-row-header">
+              <span class="perf-row-title">HISTORICAL ANNUALIZED RETURNS (CAGR) VS BENCHMARK:</span>
+              <span class="perf-benchmark-name" id="etf-benchmark-name">Benchmark: S&P 500 Net TR</span>
+            </div>
+            <div class="etf-perf-grid">
+              <div class="perf-stat-card"><span class="perf-lbl">1-YEAR RETURN</span><strong id="etf-perf-1y" class="color-green">+24.8%</strong></div>
+              <div class="perf-stat-card"><span class="perf-lbl">3-YEAR CAGR</span><strong id="etf-perf-3y" class="color-green">+12.4%</strong></div>
+              <div class="perf-stat-card"><span class="perf-lbl">5-YEAR CAGR</span><strong id="etf-perf-5y" class="color-green">+15.2%</strong></div>
+              <div class="perf-stat-card"><span class="perf-lbl">10-YEAR CAGR</span><strong id="etf-perf-10y" class="color-green">+13.9%</strong></div>
+            </div>
+            <div class="cost-sim-banner">
+              <div class="cost-sim-title">20-Year Cost of Investing Simulator (£10,000 lump sum + £200/mo @ 8% growth):</div>
+              <div class="cost-sim-text" id="etf-cost-sim-desc">
+                With an ultra-low TER of 0.07%, total fee drag over 20 years is only £1,420 (saving over £18,000 compared to a standard 0.75% active fund).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="justify-content: space-between;">
+          <button type="button" class="button button-small" id="btn-close-etf-modal-footer">Close</button>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="button button-secondary button-small" id="btn-add-to-t212-pie">🥧 Add to Trading 212 Pie</button>
+            <button type="button" class="button button-primary button-small" id="btn-etf-inject-workflow">🎯 Inject into 8-Step Workflow</button>
+          </div>
         </div>
       </div>
     </div>

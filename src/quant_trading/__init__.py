@@ -11,7 +11,7 @@ from quant_trading.metrics import (
     calculate_half_life,
     kelly_position_fraction,
 )
-from quant_trading.strategy import Strategy, TimeSeriesMomentum
+from quant_trading.strategy import Strategy, TimeSeriesMomentum, MACDStrategy
 from quant_trading.liquidity import (
     detect_cme_gaps,
     calculate_volume_profile,
@@ -27,6 +27,7 @@ __all__ = [
     "PerformanceMetrics",
     "Strategy",
     "TimeSeriesMomentum",
+    "MACDStrategy",
     "calculate_metrics",
     "calculate_half_life",
     "kelly_position_fraction",

@@ -19,7 +19,7 @@ from quant_trading.backtest import BacktestConfig, BacktestEngine
 from quant_trading.data import validate_close_prices
 from quant_trading.market_data import MarketDataError, MarketSnapshot, get_market_snapshot
 from quant_trading.metrics import calculate_metrics
-from quant_trading.strategy import TimeSeriesMomentum
+from quant_trading.strategy import TimeSeriesMomentum, MACDStrategy
 
 
 research_blueprint = Blueprint("quant_research", __name__)
@@ -621,13 +621,31 @@ def _float_parameter(payload: dict[str, Any], name: str, default: float) -> floa
 def build_backtest_response(payload: dict[str, Any]) -> dict[str, Any]:
     close = _load_prices(payload)
     periods_per_year = _int_parameter(payload, "periods_per_year", 252)
-    strategy = TimeSeriesMomentum(
-        lookback=_int_parameter(payload, "lookback", 40),
-        volatility_window=_int_parameter(payload, "volatility_window", 20),
-        target_annual_volatility=_float_parameter(payload, "target_annual_volatility", 0.15),
-        max_leverage=_float_parameter(payload, "max_leverage", 1.0),
-        periods_per_year=periods_per_year,
-    )
+    strat_type = str(payload.get("strategy", "time_series_momentum")).lower()
+
+    if strat_type == "macd":
+        strategy = MACDStrategy(
+            fast_period=_int_parameter(payload, "fast_period", 12),
+            slow_period=_int_parameter(payload, "slow_period", 26),
+            signal_period=_int_parameter(payload, "signal_period", 9),
+            volatility_window=_int_parameter(payload, "volatility_window", 20),
+            target_annual_volatility=_float_parameter(payload, "target_annual_volatility", 0.15),
+            max_leverage=_float_parameter(payload, "max_leverage", 1.0),
+            periods_per_year=periods_per_year,
+            use_trend_filter=bool(payload.get("use_trend_filter", False)),
+            trend_filter_period=_int_parameter(payload, "trend_filter_period", 200),
+            min_histogram_threshold=_float_parameter(payload, "min_histogram_threshold", 0.0),
+            allow_short=bool(payload.get("allow_short", False)),
+        )
+    else:
+        strategy = TimeSeriesMomentum(
+            lookback=_int_parameter(payload, "lookback", 40),
+            volatility_window=_int_parameter(payload, "volatility_window", 20),
+            target_annual_volatility=_float_parameter(payload, "target_annual_volatility", 0.15),
+            max_leverage=_float_parameter(payload, "max_leverage", 1.0),
+            periods_per_year=periods_per_year,
+        )
+
     config = BacktestConfig(
         periods_per_year=periods_per_year,
         one_way_cost_bps=_float_parameter(payload, "one_way_cost_bps", 2.0),

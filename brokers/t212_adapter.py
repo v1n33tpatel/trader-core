@@ -206,3 +206,54 @@ class Trading212Broker:
         res = requests.post(f"{self.base_url}/equity/orders/limit", headers=self._headers(), json=payload, timeout=5)
         res.raise_for_status()
         return res.json()
+
+    def fetch_instruments(self, force_refresh: bool = False) -> list:
+        """
+        Fetches all accessible instruments from Trading 212 API (/equity/metadata/instruments).
+        """
+        if not self.api_key:
+            return []
+        try:
+            r = requests.get(f"{self.base_url}/equity/metadata/instruments", headers=self._headers(), timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, list):
+                    return data
+            return []
+        except Exception as e:
+            print(f"[T212-INSTRUMENTS-ERROR] {e}")
+            return []
+
+    def fetch_pies(self) -> list:
+        """
+        Fetches user's custom investment pies from Trading 212 API (/equity/pies).
+        """
+        if not self.api_key:
+            return []
+        try:
+            r = requests.get(f"{self.base_url}/equity/pies", headers=self._headers(), timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, list):
+                    return data
+            return []
+        except Exception as e:
+            print(f"[T212-PIES-ERROR] {e}")
+            return []
+
+    def create_pie(self, name: str, instrument_shares: dict, dividend_action: str = "REINVEST", goal: float = 1000.0) -> dict:
+        """
+        Creates a custom pie on Trading 212 with target allocation weights.
+        """
+        if not self.api_key:
+            return {"status": "FAILED", "error": "Unconfigured credentials"}
+        payload = {
+            "name": name,
+            "instrumentShares": instrument_shares,
+            "dividendCashAction": dividend_action,
+            "goal": goal,
+        }
+        res = requests.post(f"{self.base_url}/equity/pies", headers=self._headers(), json=payload, timeout=5)
+        res.raise_for_status()
+        return res.json()
+

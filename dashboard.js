@@ -1,8 +1,8 @@
 const brokerNames = {
-  t212: "Trading 212",
+  t212: "Trading 212 (Invest & ISA)",
   etoro: "eToro Quant Hub",
   binance: "Binance Spot",
-  kraken: "Kraken Spot",
+  kraken: "Kraken Crypto",
   ctrader: "cTrader (Forex)",
   quantai: "QuantAI",
   admin: "Admin & Control",
@@ -25,6 +25,14 @@ const agentForm = document.querySelector("#agent-form");
 const agentQuery = document.querySelector("#agent-query");
 const agentResponse = document.querySelector("#agent-response");
 const agentResponseText = document.querySelector("#agent-response-text");
+
+// Trading 212 & Kraken Workstation States
+let currentT212Pillar = "ALL";
+let currentT212EtfType = "ALL";
+let currentT212NativeOnly = false;
+let currentKrakenQuote = "USD";
+let currentActiveEtfProfile = null;
+let currentPieViewMode = "holdings"; // "holdings" | "sectors"
 
 /* =========================================================================
    FLOATING TOAST HUD NOTIFICATION SYSTEM
@@ -405,23 +413,44 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
     const broker = brokerNames[currentBroker];
     portfolioTitle.textContent = `${broker} Portfolio`;
     document.querySelector(".button-refresh span:last-child").textContent = `Refresh ${broker.split(" ")[0]}`;
-    // Tailored Search Headings & Placeholders
+    // Tailored Search Headings, Placeholders & Workstation Controls
+    const t212Controls = document.querySelector("#t212-pillar-controls");
+    const krakenControls = document.querySelector("#kraken-quote-controls");
+    const catalogCount = document.querySelector("#catalog-count");
+
     if (currentBroker === "t212") {
-      document.querySelector("#search-title").innerHTML = "Search Stocks <span class='heading-amp'>&amp;</span> ETFs · Equities";
-      searchInput.placeholder = "Search stocks & ETFs (e.g. VUKE, VUSA, AAPL, NVDA, SPY, Apple)...";
-      document.querySelector("#search-button").innerHTML = "Search T212 Stocks <span aria-hidden='true'>→</span>";
-    } else if (currentBroker === "binance") {
-      document.querySelector("#search-title").innerHTML = "Search Crypto Assets · Binance Spot &amp; Alts";
-      searchInput.placeholder = "Search crypto pairs (e.g. BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT)...";
-      document.querySelector("#search-button").innerHTML = "Search Binance Crypto <span aria-hidden='true'>→</span>";
-    } else if (currentBroker === "ctrader") {
-      document.querySelector("#search-title").innerHTML = "Search Forex Pairs <span class='heading-amp'>&amp;</span> Commodities";
-      searchInput.placeholder = "Search currency pairs & metals (e.g. EURUSD, GBPUSD, USDJPY, XAUUSD)...";
-      document.querySelector("#search-button").innerHTML = "Search cTrader Forex <span aria-hidden='true'>→</span>";
+      if (t212Controls) t212Controls.hidden = false;
+      if (krakenControls) krakenControls.hidden = true;
+      if (catalogCount) catalogCount.textContent = "14,200+ ASSETS";
+      document.querySelector("#search-title").innerHTML = "Trading 212 Invest <span class='heading-amp'>&amp;</span> ISA";
+      searchInput.placeholder = "Search 14,200+ global stocks, ETFs, REITs, ETCs, crypto ETNs...";
+      document.querySelector("#search-button").innerHTML = "Filter &amp; Search <span aria-hidden='true'>→</span>";
+      if (typeof loadT212Screener === "function") loadT212Screener(searchInput.value.trim());
+    } else if (currentBroker === "kraken") {
+      if (t212Controls) t212Controls.hidden = true;
+      if (krakenControls) krakenControls.hidden = false;
+      if (catalogCount) catalogCount.textContent = "KRAKEN CRYPTO SPOT";
+      document.querySelector("#search-title").innerHTML = "Kraken Institutional Crypto <span class='heading-amp'>·</span> Spot Pairs";
+      searchInput.placeholder = "Search Kraken crypto pairs (e.g. BTC, ETH, SOL, XBTUSD)...";
+      document.querySelector("#search-button").innerHTML = "Filter Pairs <span aria-hidden='true'>→</span>";
+      if (typeof loadKrakenPairs === "function") loadKrakenPairs(currentKrakenQuote, searchInput.value.trim());
     } else {
-      document.querySelector("#search-title").textContent = `Search ${broker} Instruments`;
-      searchInput.placeholder = "Search by ticker or name...";
-      document.querySelector("#search-button").innerHTML = `Search ${broker.split(" ")[0]} <span aria-hidden="true">→</span>`;
+      if (t212Controls) t212Controls.hidden = true;
+      if (krakenControls) krakenControls.hidden = true;
+      if (catalogCount) catalogCount.textContent = "CATALOG";
+      if (currentBroker === "binance") {
+        document.querySelector("#search-title").innerHTML = "Search Crypto Assets · Binance Spot &amp; Alts";
+        searchInput.placeholder = "Search crypto pairs (e.g. BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT)...";
+        document.querySelector("#search-button").innerHTML = "Search Binance Crypto <span aria-hidden='true'>→</span>";
+      } else if (currentBroker === "ctrader") {
+        document.querySelector("#search-title").innerHTML = "Search Forex Pairs <span class='heading-amp'>&amp;</span> Commodities";
+        searchInput.placeholder = "Search currency pairs & metals (e.g. EURUSD, GBPUSD, USDJPY, XAUUSD)...";
+        document.querySelector("#search-button").innerHTML = "Search cTrader Forex <span aria-hidden='true'>→</span>";
+      } else {
+        document.querySelector("#search-title").textContent = `Search ${broker} Instruments`;
+        searchInput.placeholder = "Search by ticker or name...";
+        document.querySelector("#search-button").innerHTML = `Search ${broker.split(" ")[0]} <span aria-hidden="true">→</span>`;
+      }
     }
 
     document.querySelector("#agent-title").textContent = `${broker} Research Agent`;
@@ -538,6 +567,20 @@ searchForm.addEventListener("submit", async (event) => {
 async function renderSearch(query) {
   searchResults.replaceChildren();
   searchResults.hidden = false;
+
+  if (currentBroker === "t212") {
+    if (typeof loadT212Screener === "function") {
+      await loadT212Screener(query);
+    }
+    return;
+  }
+
+  if (currentBroker === "kraken") {
+    if (typeof loadKrakenPairs === "function") {
+      await loadKrakenPairs(currentKrakenQuote, query);
+    }
+    return;
+  }
 
   if (!query) {
     renderSearchMessage("Enter a ticker or company name to search the local demo catalog.");
@@ -3982,6 +4025,667 @@ function initResourceHub() {
   }
 }
 
+/* =========================================================================
+   TRADING 212 INVEST (14,200+ ASSETS) & KRAKEN WORKSTATIONS
+   ========================================================================= */
+
+function getPillarBadgeColor(pillar) {
+  switch (pillar) {
+    case "STOCKS": return "color-blue";
+    case "ETFS": return "color-green";
+    case "REITS": return "color-orange";
+    case "ETCS": return "color-gold";
+    case "CRYPTO_ETNS": return "color-purple";
+    default: return "";
+  }
+}
+
+async function loadT212Screener(query = "") {
+  if (!searchResults) return;
+  searchResults.replaceChildren();
+  searchResults.hidden = false;
+
+  const url = new URL("/api/t212/instruments", window.location.origin);
+  if (query) url.searchParams.set("q", query);
+  if (currentT212Pillar && currentT212Pillar !== "ALL") url.searchParams.set("pillar", currentT212Pillar);
+  if (currentT212EtfType && currentT212EtfType !== "ALL") url.searchParams.set("etf_type", currentT212EtfType);
+  if (currentT212NativeOnly) url.searchParams.set("native_only", "true");
+  url.searchParams.set("limit", "25");
+
+  const loader = document.createElement("div");
+  loader.className = "search-empty";
+  loader.textContent = "Scanning 14,200+ Trading 212 instruments...";
+  searchResults.appendChild(loader);
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    searchResults.replaceChildren();
+
+    if (!res.ok || data.status !== "success") {
+      renderSearchMessage(data.error || "Failed to load Trading 212 instruments.");
+      return;
+    }
+
+    const items = data.results || [];
+    const total = data.total || items.length;
+    const catCount = document.querySelector("#catalog-count");
+    if (catCount) catCount.textContent = `${total.toLocaleString()} ASSETS MATCHED`;
+
+    if (items.length === 0) {
+      renderSearchMessage(`No instruments found matching "${query || currentT212Pillar}". Try resetting filters.`);
+      return;
+    }
+
+    items.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "result-row t212-result-row";
+
+      const symbolCol = document.createElement("div");
+      symbolCol.className = "t212-symbol-col";
+
+      const ticker = document.createElement("span");
+      ticker.className = "result-symbol";
+      ticker.textContent = item.ticker;
+
+      const badgeRow = document.createElement("div");
+      badgeRow.className = "t212-badge-row";
+
+      // Pillar badge
+      const pillarBadge = document.createElement("span");
+      pillarBadge.className = `badge badge-strat ${getPillarBadgeColor(item.pillar)}`;
+      pillarBadge.textContent = item.pillar;
+      badgeRow.appendChild(pillarBadge);
+
+      // ETF policy badge
+      if (item.pillar === "ETFS" && item.etf_type) {
+        const etfBadge = document.createElement("span");
+        etfBadge.className = "badge badge-strat";
+        etfBadge.textContent = item.etf_type === "DIVIDEND_DIST" ? "Distributing" : item.etf_type === "ACCUMULATING" ? "Accumulating" : item.etf_type;
+        badgeRow.appendChild(etfBadge);
+      }
+
+      // Native GBX badge
+      if (item.is_gbx) {
+        const gbxBadge = document.createElement("span");
+        gbxBadge.className = "badge badge-strat color-purple";
+        gbxBadge.textContent = "0% FX (GBX)";
+        gbxBadge.title = "Pence sterling: No 0.15% currency conversion fee";
+        badgeRow.appendChild(gbxBadge);
+      }
+
+      symbolCol.append(ticker, badgeRow);
+
+      const nameCol = document.createElement("div");
+      nameCol.className = "result-name";
+      nameCol.innerHTML = `<strong>${escapeHtml(item.name)}</strong><span class="sub-meta">${item.currency} · ${item.is_fractional ? "Fractional from £1" : "Whole shares"} · ISIN: ${escapeHtml(item.isin || "—")}</span>`;
+
+      const actions = document.createElement("div");
+      actions.className = "result-actions";
+
+      // If ETF, add Pie breakdown button
+      if (item.pillar === "ETFS" || item.ticker.includes("VUSA") || item.ticker.includes("VUAG") || item.ticker.includes("EQQQ") || item.ticker.includes("VUKE") || item.ticker.includes("IUKD") || item.ticker.includes("SGLN")) {
+        const pieBtn = document.createElement("button");
+        pieBtn.type = "button";
+        pieBtn.className = "btn-pie-breakdown";
+        pieBtn.innerHTML = "<span>🥧 Break Down Pie</span>";
+        pieBtn.title = "View underlying holdings, sector allocation donut, and 20-year cost simulator";
+        pieBtn.addEventListener("click", () => {
+          openEtfBreakdownModal(item.ticker);
+        });
+        actions.appendChild(pieBtn);
+      }
+
+      // Watchlist button
+      const inWatchlist = isSymbolInBrokerWatchlist("t212", item.ticker);
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "btn-add-watchlist";
+      addBtn.textContent = inWatchlist ? "✓ Added" : "+ Watchlist";
+      addBtn.disabled = inWatchlist;
+      addBtn.addEventListener("click", () => {
+        addToBrokerWatchlist("t212", {
+          symbol: item.ticker,
+          name: item.name,
+          type: item.pillar === "ETFS" ? "ETF" : "STOCK",
+          sentiment: "+0.35",
+          bias: "BULLISH",
+        });
+        addBtn.textContent = "✓ Added";
+        addBtn.disabled = true;
+        renderWatchlist();
+      });
+      actions.appendChild(addBtn);
+
+      // Workflow button
+      const wfBtn = document.createElement("button");
+      wfBtn.type = "button";
+      wfBtn.className = "btn-step-workflow";
+      wfBtn.innerHTML = "<span>⚡ Step into Workflow</span>";
+      wfBtn.title = `Launch 8-Step Quantitative Pipeline for ${item.ticker}`;
+      wfBtn.addEventListener("click", () => {
+        loadWorkflowRecommendation(item.ticker);
+        document.querySelector("#trade-workflow-card")?.scrollIntoView({ behavior: "smooth" });
+      });
+      actions.appendChild(wfBtn);
+
+      row.append(symbolCol, nameCol, actions);
+      searchResults.appendChild(row);
+    });
+  } catch (err) {
+    renderSearchMessage(`Error loading instruments: ${err.message}`);
+  }
+}
+
+async function loadKrakenPairs(quoteCurrency = currentKrakenQuote, query = "") {
+  if (!searchResults) return;
+  searchResults.replaceChildren();
+  searchResults.hidden = false;
+
+  const url = new URL("/api/kraken/pairs", window.location.origin);
+  url.searchParams.set("quote", quoteCurrency || "USD");
+
+  const loader = document.createElement("div");
+  loader.className = "search-empty";
+  loader.textContent = `Loading Kraken ${quoteCurrency} spot pairs with rate protection...`;
+  searchResults.appendChild(loader);
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    searchResults.replaceChildren();
+
+    if (!res.ok || data.status !== "success") {
+      renderSearchMessage(data.error || "Failed to load Kraken pairs.");
+      return;
+    }
+
+    let pairs = data.pairs || [];
+    if (query) {
+      const qUpper = query.toUpperCase();
+      pairs = pairs.filter((p) =>
+        (p.wsname && p.wsname.toUpperCase().includes(qUpper)) ||
+        (p.altname && p.altname.toUpperCase().includes(qUpper)) ||
+        (p.base && p.base.toUpperCase().includes(qUpper)) ||
+        (p.pair && p.pair.toUpperCase().includes(qUpper))
+      );
+    }
+
+    const catCount = document.querySelector("#catalog-count");
+    if (catCount) catCount.textContent = `${pairs.length} KRAKEN PAIRS`;
+
+    if (pairs.length === 0) {
+      renderSearchMessage(`No Kraken pairs found for "${query || quoteCurrency}".`);
+      return;
+    }
+
+    pairs.slice(0, 30).forEach((pair) => {
+      const row = document.createElement("div");
+      row.className = "result-row kraken-result-row";
+
+      const symbolCol = document.createElement("div");
+      symbolCol.className = "t212-symbol-col";
+
+      const pairName = pair.wsname || `${pair.base}/${pair.quote}`;
+      const ticker = document.createElement("span");
+      ticker.className = "result-symbol";
+      ticker.textContent = pairName;
+
+      const badgeRow = document.createElement("div");
+      badgeRow.className = "t212-badge-row";
+
+      const statusBadge = document.createElement("span");
+      statusBadge.className = "badge badge-strat color-green";
+      statusBadge.textContent = pair.status || "online";
+      badgeRow.appendChild(statusBadge);
+
+      const quoteBadge = document.createElement("span");
+      quoteBadge.className = "badge badge-strat";
+      quoteBadge.textContent = `Quote: ${pair.quote}`;
+      badgeRow.appendChild(quoteBadge);
+
+      symbolCol.append(ticker, badgeRow);
+
+      const nameCol = document.createElement("div");
+      nameCol.className = "result-name";
+      nameCol.innerHTML = `<strong>${escapeHtml(pair.base)} / ${escapeHtml(pair.quote)} Spot Market</strong><span class="sub-meta">Altname: ${escapeHtml(pair.altname || pair.pair)} · Decimals: ${pair.lot_decimals || 8} · Leaky Bucket Paced</span>`;
+
+      const actions = document.createElement("div");
+      actions.className = "result-actions";
+
+      // Watchlist button
+      const cleanSymbol = pair.altname || pair.pair;
+      const inWatchlist = isSymbolInBrokerWatchlist("kraken", cleanSymbol);
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "btn-add-watchlist";
+      addBtn.textContent = inWatchlist ? "✓ Added" : "+ Watchlist";
+      addBtn.disabled = inWatchlist;
+      addBtn.addEventListener("click", () => {
+        addToBrokerWatchlist("kraken", {
+          symbol: cleanSymbol,
+          name: pairName,
+          type: "CRYPTO",
+          sentiment: "+0.45",
+          bias: "BULLISH",
+        });
+        addBtn.textContent = "✓ Added";
+        addBtn.disabled = true;
+        renderWatchlist();
+      });
+      actions.appendChild(addBtn);
+
+      // Workflow button
+      const wfBtn = document.createElement("button");
+      wfBtn.type = "button";
+      wfBtn.className = "btn-step-workflow";
+      wfBtn.innerHTML = "<span>⚡ Step into Workflow</span>";
+      wfBtn.title = `Launch 8-Step Quantitative Pipeline for ${pairName}`;
+      wfBtn.addEventListener("click", () => {
+        loadWorkflowRecommendation(pair.base ? `${pair.base}USDT` : cleanSymbol);
+        document.querySelector("#trade-workflow-card")?.scrollIntoView({ behavior: "smooth" });
+      });
+      actions.appendChild(wfBtn);
+
+      row.append(symbolCol, nameCol, actions);
+      searchResults.appendChild(row);
+    });
+  } catch (err) {
+    renderSearchMessage(`Error loading Kraken pairs: ${err.message}`);
+  }
+}
+
+/* ETF BREAKDOWN MODAL & CANVAS DONUT CHART */
+const DONUT_COLORS = [
+  "#38bdf8", "#818cf8", "#a855f7", "#ec4899", "#f43f5e",
+  "#f59e0b", "#10b981", "#06b6d4", "#6366f1", "#14b8a6",
+  "#94a3b8", "#64748b"
+];
+
+async function openEtfBreakdownModal(ticker) {
+  const modal = document.querySelector("#modal-etf-breakdown");
+  if (!modal) return;
+
+  showToast(`Loading ETF analysis for ${ticker}...`, "info", 1500);
+
+  try {
+    const res = await fetch(`/api/t212/etf/breakdown?ticker=${encodeURIComponent(ticker)}`);
+    const data = await res.json();
+    if (!res.ok || data.status !== "success") {
+      showToast(`Failed to load ETF breakdown: ${data.error || "Unknown error"}`, "error", 3000);
+      return;
+    }
+
+    const p = data.profile;
+    currentActiveEtfProfile = p;
+
+    // Populate Title & Badges
+    const titleEl = document.querySelector("#etf-modal-title");
+    if (titleEl) titleEl.textContent = `${p.name} · ${p.ticker}`;
+
+    const fxBadge = document.querySelector("#etf-modal-fx-badge");
+    if (fxBadge) {
+      if (p.is_native_gbx) {
+        fxBadge.textContent = "0.0% FX DRAG (GBX)";
+        fxBadge.className = "badge badge-strat color-purple";
+      } else {
+        fxBadge.textContent = "0.15% FX FEE (NON-GBP)";
+        fxBadge.className = "badge badge-strat color-orange";
+      }
+    }
+
+    // Populate Telemetry HUD
+    const hudTer = document.querySelector("#etf-hud-ter");
+    if (hudTer) hudTer.textContent = `${p.ongoing_charges_figure.toFixed(2)}%`;
+
+    const hudYield = document.querySelector("#etf-hud-yield");
+    if (hudYield) hudYield.textContent = `${p.dividend_yield_pct.toFixed(2)}%`;
+
+    const hudPolicy = document.querySelector("#etf-hud-policy");
+    if (hudPolicy) {
+      hudPolicy.textContent = p.distribution_policy;
+      hudPolicy.className = `badge badge-strat ${p.distribution_policy.includes("Dist") ? "color-gold" : "color-blue"}`;
+    }
+
+    const hudCagr = document.querySelector("#etf-hud-cagr");
+    if (hudCagr) {
+      const cagr = p.performance?.five_year_cagr ?? 0;
+      hudCagr.textContent = `${cagr >= 0 ? "+" : ""}${cagr.toFixed(1)}%`;
+      hudCagr.className = cagr >= 0 ? "color-green" : "color-red";
+    }
+
+    const hudMdd = document.querySelector("#etf-hud-mdd");
+    if (hudMdd) {
+      const mdd = p.performance?.max_drawdown ?? 0;
+      hudMdd.textContent = `${mdd.toFixed(1)}%`;
+    }
+
+    const hudAum = document.querySelector("#etf-hud-aum");
+    if (hudAum) {
+      hudAum.textContent = `£${p.fund_size_gbp_m.toLocaleString()}M`;
+    }
+
+    // Benchmark & Historical Performance
+    const benchName = document.querySelector("#etf-benchmark-name");
+    if (benchName) benchName.textContent = `Benchmark: ${p.benchmark_index || "Market Index"}`;
+
+    const setPerfVal = (id, val) => {
+      const el = document.querySelector(id);
+      if (!el) return;
+      if (val === null || val === undefined) {
+        el.textContent = "N/A";
+        el.className = "";
+      } else {
+        el.textContent = `${val >= 0 ? "+" : ""}${val.toFixed(1)}%`;
+        el.className = val >= 0 ? "color-green" : "color-red";
+      }
+    };
+    setPerfVal("#etf-perf-1y", p.performance?.one_year_cagr);
+    setPerfVal("#etf-perf-3y", p.performance?.three_year_cagr);
+    setPerfVal("#etf-perf-5y", p.performance?.five_year_cagr);
+    setPerfVal("#etf-perf-10y", p.performance?.ten_year_cagr);
+
+    // Cost Simulator
+    const simDesc = document.querySelector("#etf-cost-sim-desc");
+    if (simDesc) {
+      const cs = p.cost_simulator || {};
+      const drag20 = cs.total_fee_drag_20y ?? 1420;
+      const netPot = cs.net_pot_20y ?? 136000;
+      const verdict = cs.drag_verdict || "MINIMAL";
+      simDesc.innerHTML = `With a TER of <strong>${p.ongoing_charges_figure.toFixed(2)}%</strong> (${verdict}), your projected 20-year portfolio value is <strong>£${netPot.toLocaleString()}</strong> with an estimated fee drag of <strong>£${drag20.toLocaleString()}</strong>. Choosing an ultra-low fee index ETF saves £15,000–£20,000+ vs high-fee 0.75% active funds.`;
+    }
+
+    // Render Slices & Donut Canvas
+    currentPieViewMode = "holdings";
+    updatePieTabsUI();
+    renderPieSlicesAndCanvas();
+
+    modal.hidden = false;
+  } catch (err) {
+    showToast(`Error opening ETF breakdown: ${err.message}`, "error", 3000);
+  }
+}
+
+function updatePieTabsUI() {
+  const btnHoldings = document.querySelector("#btn-toggle-pie-holdings");
+  const btnSectors = document.querySelector("#btn-toggle-pie-sectors");
+  if (btnHoldings) btnHoldings.classList.toggle("is-active", currentPieViewMode === "holdings");
+  if (btnSectors) btnSectors.classList.toggle("is-active", currentPieViewMode === "sectors");
+}
+
+function renderPieSlicesAndCanvas() {
+  if (!currentActiveEtfProfile) return;
+  const p = currentActiveEtfProfile;
+  const slicesList = document.querySelector("#pie-slices-list");
+  const heading = document.querySelector("#pie-slices-heading");
+  const sub = document.querySelector("#pie-slices-sub");
+
+  if (!slicesList) return;
+  slicesList.replaceChildren();
+
+  let slices = [];
+  if (currentPieViewMode === "holdings") {
+    if (heading) heading.textContent = "TOP 10 UNDERLYING HOLDINGS";
+    if (sub) sub.textContent = "Individual Equity / Asset Weights";
+    slices = (p.holdings || []).map((h, idx) => ({
+      label: `${h.ticker ? h.ticker + " · " : ""}${h.name}`,
+      weight: h.weight_pct,
+      color: DONUT_COLORS[idx % DONUT_COLORS.length],
+      extra: h.sector || h.country || "",
+    }));
+    if (p.other_holdings_weight_pct > 0) {
+      slices.push({
+        label: `Other Underlying Holdings (${p.other_holdings_weight_pct.toFixed(1)}%)`,
+        weight: p.other_holdings_weight_pct,
+        color: DONUT_COLORS[10],
+        extra: "Remaining holdings",
+      });
+    }
+  } else {
+    if (heading) heading.textContent = "SECTOR ALLOCATION BREAKDOWN";
+    if (sub) sub.textContent = "Industry & Sector Distribution";
+    slices = (p.sectors || []).map((s, idx) => ({
+      label: s.sector_name,
+      weight: s.weight_pct,
+      color: DONUT_COLORS[idx % DONUT_COLORS.length],
+      extra: "",
+    }));
+  }
+
+  // Populate Slices List
+  slices.forEach((s) => {
+    const item = document.createElement("div");
+    item.className = "slice-item-row";
+
+    const swatch = document.createElement("span");
+    swatch.className = "slice-swatch";
+    swatch.style.backgroundColor = s.color;
+
+    const label = document.createElement("span");
+    label.className = "slice-label";
+    label.textContent = s.label;
+
+    const weight = document.createElement("strong");
+    weight.className = "slice-weight";
+    weight.textContent = `${s.weight.toFixed(2)}%`;
+
+    item.append(swatch, label, weight);
+    slicesList.appendChild(item);
+  });
+
+  // Draw Canvas Donut
+  drawDonutChart(slices, currentPieViewMode === "holdings" ? `${p.ongoing_charges_figure}% TER` : "Sectors");
+}
+
+function drawDonutChart(slices, centerText) {
+  const canvas = document.querySelector("#etf-pie-canvas");
+  if (!canvas) return;
+
+  const ratio = window.devicePixelRatio || 1;
+  const width = 300;
+  const height = 300;
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ratio, ratio);
+  ctx.clearRect(0, 0, width, height);
+
+  const totalWeight = slices.reduce((acc, s) => acc + s.weight, 0);
+  if (totalWeight <= 0) return;
+
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const outerRadius = width * 0.42;
+  const innerRadius = width * 0.26;
+
+  let currentAngle = -Math.PI / 2; // Start from top (12 o'clock)
+
+  slices.forEach((s) => {
+    const sliceAngle = (s.weight / totalWeight) * (2 * Math.PI);
+    const endAngle = currentAngle + sliceAngle;
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, outerRadius, currentAngle, endAngle, false);
+    ctx.arc(centerX, centerY, innerRadius, endAngle, currentAngle, true);
+    ctx.closePath();
+
+    ctx.fillStyle = s.color;
+    ctx.fill();
+
+    // Segment divider
+    ctx.strokeStyle = "#0b0f17";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    currentAngle = endAngle;
+  });
+
+  // Center cutout circle
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, innerRadius, 0, 2 * Math.PI, false);
+  ctx.fillStyle = "#111827";
+  ctx.fill();
+
+  // Center Text
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "bold 13px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(centerText || "ETF Pie", centerX, centerY - 6);
+
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "10px Inter, sans-serif";
+  ctx.fillText("ALLOCATION", centerX, centerY + 10);
+}
+
+function initT212AndKrakenWorkstation() {
+  // 1. T212 5-Pillar Buttons
+  document.querySelectorAll("#t212-pillar-buttons .pillar-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#t212-pillar-buttons .pillar-btn").forEach((b) => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      currentT212Pillar = btn.dataset.pillar || "ALL";
+
+      // Show ETF facets only for ALL or ETFS
+      const etfFacets = document.querySelector("#t212-etf-facets");
+      if (etfFacets) {
+        etfFacets.style.display = (currentT212Pillar === "ALL" || currentT212Pillar === "ETFS") ? "flex" : "none";
+      }
+
+      loadT212Screener(searchInput.value.trim());
+    });
+  });
+
+  // 2. ETF Smart Facets
+  document.querySelectorAll("#t212-etf-facets .facet-pill[data-etf-type]").forEach((pill) => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll("#t212-etf-facets .facet-pill[data-etf-type]").forEach((p) => p.classList.remove("is-active"));
+      pill.classList.add("is-active");
+      currentT212EtfType = pill.dataset.etfType || "ALL";
+      loadT212Screener(searchInput.value.trim());
+    });
+  });
+
+  // Native GBX Toggle Pill
+  const btnGbx = document.querySelector("#btn-facet-native-gbx");
+  if (btnGbx) {
+    btnGbx.addEventListener("click", () => {
+      currentT212NativeOnly = !currentT212NativeOnly;
+      btnGbx.classList.toggle("is-active", currentT212NativeOnly);
+      loadT212Screener(searchInput.value.trim());
+    });
+  }
+
+  // 3. Kraken Quote Tabs
+  document.querySelectorAll("#kraken-quote-buttons .pillar-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#kraken-quote-buttons .pillar-btn").forEach((b) => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      currentKrakenQuote = btn.dataset.quote || "USD";
+      loadKrakenPairs(currentKrakenQuote, searchInput.value.trim());
+    });
+  });
+
+  // 4. ETF Modal Controls
+  const modal = document.querySelector("#modal-etf-breakdown");
+  const btnClose = document.querySelector("#btn-close-etf-modal");
+  const btnCloseFooter = document.querySelector("#btn-close-etf-modal-footer");
+  if (btnClose) btnClose.addEventListener("click", () => { if (modal) modal.hidden = true; });
+  if (btnCloseFooter) btnCloseFooter.addEventListener("click", () => { if (modal) modal.hidden = true; });
+
+  // Backdrop click to close
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.hidden = true;
+    });
+  }
+
+  // Toggle Holdings vs Sectors
+  const btnToggleHoldings = document.querySelector("#btn-toggle-pie-holdings");
+  const btnToggleSectors = document.querySelector("#btn-toggle-pie-sectors");
+  if (btnToggleHoldings) {
+    btnToggleHoldings.addEventListener("click", () => {
+      currentPieViewMode = "holdings";
+      updatePieTabsUI();
+      renderPieSlicesAndCanvas();
+    });
+  }
+  if (btnToggleSectors) {
+    btnToggleSectors.addEventListener("click", () => {
+      currentPieViewMode = "sectors";
+      updatePieTabsUI();
+      renderPieSlicesAndCanvas();
+    });
+  }
+
+  // Inject ETF into 8-Step Dual-Engine Workflow
+  const btnInjectWf = document.querySelector("#btn-etf-inject-workflow");
+  if (btnInjectWf) {
+    btnInjectWf.addEventListener("click", () => {
+      if (modal) modal.hidden = true;
+      if (currentActiveEtfProfile) {
+        loadWorkflowRecommendation(currentActiveEtfProfile.ticker);
+        document.querySelector("#trade-workflow-card")?.scrollIntoView({ behavior: "smooth" });
+        showToast(`Injected ${currentActiveEtfProfile.ticker} into 8-Step Dual-Engine Workflow`, "success", 2500);
+      }
+    });
+  }
+
+  // Add to Trading 212 Pie button
+  const btnAddPie = document.querySelector("#btn-add-to-t212-pie");
+  if (btnAddPie) {
+    btnAddPie.addEventListener("click", async () => {
+      if (!currentActiveEtfProfile) return;
+      const t = currentActiveEtfProfile.ticker;
+      btnAddPie.disabled = true;
+      btnAddPie.textContent = "Adding to Pie...";
+      try {
+        const payload = {
+          name: `Pie with ${t}`,
+          instrumentShares: { [t]: 1.0 },
+          dividendCashAction: "REINVEST",
+          goal: 1000.0,
+        };
+        const res = await fetch("/api/t212/pies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          showToast(`Successfully added ${t} to Trading 212 Pie!`, "success", 3000);
+        } else {
+          showToast(`Pie creation: ${data.error || "Failed"}`, "warning", 3000);
+        }
+      } catch (err) {
+        showToast(`Error dispatching pie: ${err.message}`, "error", 3000);
+      } finally {
+        btnAddPie.disabled = false;
+        btnAddPie.textContent = "🥧 Add to Trading 212 Pie";
+      }
+    });
+  }
+
+  // Initialize display state based on active broker
+  const t212Controls = document.querySelector("#t212-pillar-controls");
+  const krakenControls = document.querySelector("#kraken-quote-controls");
+  if (currentBroker === "t212") {
+    if (t212Controls) t212Controls.hidden = false;
+    if (krakenControls) krakenControls.hidden = true;
+    loadT212Screener("");
+  } else if (currentBroker === "kraken") {
+    if (t212Controls) t212Controls.hidden = true;
+    if (krakenControls) krakenControls.hidden = false;
+    loadKrakenPairs(currentKrakenQuote, "");
+  } else {
+    if (t212Controls) t212Controls.hidden = true;
+    if (krakenControls) krakenControls.hidden = true;
+  }
+}
+
 // Global initialization of new workflow & copilot modules
 initWorkflowController();
 initQuantCopilot();
@@ -3989,6 +4693,7 @@ initAdminControls();
 initCommandPalette();
 initShortcutsModal();
 initResourceHub();
+initT212AndKrakenWorkstation();
 initGlobalShortcuts();
 applyWorkspaceViewMode();
 renderWatchlist();

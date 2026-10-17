@@ -32,6 +32,21 @@ STRATEGY_CATALOG = {
             "name": "Institutional Price Action & Market Structure",
             "description": "Trades swing pivots, liquidity sweeps, pinbar rejections, and break of structure (BOS).",
             "params": {"pivot_window": 5, "min_wick_ratio": 0.50, "risk_reward_ratio": 2.0, "max_sl_pct": 3.5}
+        },
+        "macd_risk": {
+            "name": "MACD Trend & Volatility Sentinel",
+            "description": "Momentum crossover with 200 EMA trend filter, ATR volatility stops, and mandatory 1:2.0+ R:R.",
+            "params": {
+                "fast_period": 12,
+                "slow_period": 26,
+                "signal_period": 9,
+                "risk_reward_ratio": 2.2,
+                "max_sl_pct": 2.0,
+                "sl_atr_mult": 1.5,
+                "min_hist_threshold": 0.0002,
+                "use_trend_filter": True,
+                "trend_period": 200,
+            }
         }
     },
     "etf": {
