@@ -102,3 +102,54 @@ def test_optimizer_ranks_training_and_reports_holdout_separately(monkeypatch) ->
     assert len(result["candidates"]) == 3
     assert result["train_end"] < result["validation_start"]
     assert "validation" in result["baseline"]
+
+
+def test_analyze_avoids_openwebui_generate_endpoint_and_falls_back_to_ollama(monkeypatch) -> None:
+    snapshot = make_snapshot()
+    monkeypatch.setattr(flask_api, "get_market_snapshot", lambda *args: snapshot)
+
+    from core.state_store import StateStore
+    store = StateStore()
+    store.set_setting("orchestrator_url", "http://192.168.2.15:8080")
+    store.set_setting("open_webui_api_key", "sk-test-key")
+
+    calls = []
+
+    def mock_post(url, **kwargs):
+        calls.append(url)
+        # If open-webui chat completions is hit, simulate 401 or failure
+        if "192.168.2.15:8080" in url:
+            if url.endswith("/api/generate"):
+                raise AssertionError("CRITICAL: /api/generate must NEVER be called on Open-WebUI port 8080!")
+            # Simulate Open-WebUI error to trigger Ollama fallback
+            resp = flask_api.requests.Response()
+            resp.status_code = 401
+            return resp
+
+        # Direct Ollama fallback on port 11434
+        if ":11434" in url and url.endswith("/api/generate"):
+            resp = flask_api.requests.Response()
+            resp.status_code = 200
+            resp._content = b'{"response": "<think>Evaluating FVG</think>Confirmed bullish trend on SPY."}'
+            return resp
+
+        raise AssertionError(f"Unexpected URL: {url}")
+
+    monkeypatch.setattr(flask_api.requests, "post", mock_post)
+    from main import app
+
+    response = app.test_client().post("/api/research/analyze", json={
+        "provider": "yahoo",
+        "symbol": "SPY",
+        "interval": "1d",
+        "period": "3mo",
+        "question": "What is the structure?",
+    })
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["analysis"] == "Confirmed bullish trend on SPY."
+    assert "<think>" not in data["analysis"]
+    # Verify 192.168.2.15:8080/api/generate was NEVER called
+    assert not any(c.endswith("8080/api/generate") for c in calls)
+

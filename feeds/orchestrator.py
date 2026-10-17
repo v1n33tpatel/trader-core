@@ -486,11 +486,14 @@ Return STRICT RAW JSON ONLY in this format:
                         content = r.json().get("choices", [{}])[0].get("message", {}).get("content", "")
                         latency = round((time.perf_counter() - t0) * 1000, 1)
                         return {"text": content, "latency_ms": latency}
-                except Exception as e:
-                    return {"text": f'{{"error": "{str(e)}"}}', "latency_ms": 0.0}
+                except Exception:
+                    # Fall through to local Ollama fallback
+                    pass
 
-            # Direct Ollama Native endpoint
-            url = f"{self.base_url}/api/generate"
+            # Direct Ollama Native endpoint (fallback or default)
+            # NEVER call /api/generate on an Open-WebUI port (:8080, :3000)
+            ollama_host = self.base_url if (not self.is_open_webui and "11434" in self.base_url) else os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434").rstrip("/")
+            url = f"{ollama_host}/api/generate"
             payload = {
                 "model": self.model,
                 "prompt": prompt,
@@ -504,6 +507,8 @@ Return STRICT RAW JSON ONLY in this format:
                     content = r.json().get("response", "")
                     latency = round((time.perf_counter() - t0) * 1000, 1)
                     return {"text": content, "latency_ms": latency}
+                else:
+                    return {"text": f'{{"error": "Ollama host returned HTTP {r.status_code}: {r.text}"}}', "latency_ms": 0.0}
             except Exception as e:
                 return {"text": f'{{"error": "{str(e)}"}}', "latency_ms": 0.0}
 

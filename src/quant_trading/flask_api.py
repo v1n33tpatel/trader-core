@@ -2,6 +2,7 @@ import csv
 import json
 import math
 import os
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
@@ -234,48 +235,95 @@ def analyze_market_route():
     store = StateStore()
     stored_url = store.get_setting("orchestrator_url", "")
     stored_model = store.get_setting("orchestrator_model", "")
+    stored_key = store.get_setting("open_webui_api_key", "")
+    stored_ollama = store.get_setting("ollama_host", "")
 
-    ollama_url = (stored_url or os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")).rstrip("/")
-    model_name = stored_model or os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+    ollama_host = (stored_ollama or os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")).rstrip("/")
+    model_name = stored_model or os.getenv("OLLAMA_MODEL", "deepseek-r1:7b")
 
-    try:
-        response = requests.post(
-            f"{ollama_url}/api/generate",
-            json={"model": model_name, "prompt": prompt, "stream": False},
-            timeout=45,
-        )
-        if getattr(response, "status_code", 200) == 404:
-            # Model not found on Ollama, try finding an available model from tags
-            try:
-                tags_resp = requests.get(f"{ollama_url}/api/tags", timeout=5)
-                if tags_resp.status_code == 200:
-                    tags_data = tags_resp.json()
-                    avail_models = [m.get("name") for m in tags_data.get("models", [])]
-                    if avail_models:
-                        model_name = avail_models[0]
-                        response = requests.post(
-                            f"{ollama_url}/api/generate",
-                            json={"model": model_name, "prompt": prompt, "stream": False},
-                            timeout=45,
-                        )
-            except Exception:
-                pass
-        response.raise_for_status()
-        analysis = response.json().get("response", "")
-        if not analysis:
-            return jsonify({"error": "The analysis model returned an empty response"}), 502
-    except requests.RequestException as e:
-        err_msg = str(e)
-        if hasattr(e, "response") and e.response is not None:
-            try:
-                err_json = e.response.json()
-                if "error" in err_json:
-                    err_msg = err_json["error"]
-            except Exception:
-                err_msg = e.response.text or str(e)
-        return jsonify({"error": f"Analysis model is unavailable: {err_msg}"}), 502
-    except (ValueError, AttributeError) as e:
-        return jsonify({"error": f"Analysis model returned an invalid response: {str(e)}"}), 502
+    analysis = ""
+    # 1. If stored_url is explicitly Open-WebUI (ports 8080 or 3000), attempt OpenAI-compatible endpoint
+    is_open_webui = bool(stored_url and ("8080" in stored_url or "3000" in stored_url))
+    if is_open_webui:
+        owui_url = f"{stored_url.rstrip('/')}/api/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        if stored_key:
+            headers["Authorization"] = f"Bearer {stored_key}"
+        try:
+            owui_resp = requests.post(
+                owui_url,
+                headers=headers,
+                json={
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": "You are an institutional Price Action quantitative analyst operating under a strict NON-PREDICTIVE mandate."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.2,
+                    "stream": False,
+                },
+                timeout=45,
+            )
+            if owui_resp.status_code == 200:
+                choices = owui_resp.json().get("choices", [])
+                if choices:
+                    analysis = choices[0].get("message", {}).get("content", "")
+        except Exception:
+            # Fall through to direct Ollama
+            pass
+
+    # 2. If no analysis from Open-WebUI, execute against native Ollama endpoint (/api/generate)
+    if not analysis:
+        # Determine actual Ollama host: NEVER call /api/generate on Open-WebUI!
+        target_ollama = stored_url if (stored_url and not is_open_webui) else ollama_host
+        target_ollama = target_ollama.rstrip("/")
+
+        preferred_model = model_name
+        try:
+            response = requests.post(
+                f"{target_ollama}/api/generate",
+                json={"model": preferred_model, "prompt": prompt, "stream": False},
+                timeout=45,
+            )
+            if getattr(response, "status_code", 200) == 404:
+                # Model not found on Ollama, try finding an available model from tags per Rule 12
+                try:
+                    tags_resp = requests.get(f"{target_ollama}/api/tags", timeout=5)
+                    if tags_resp.status_code == 200:
+                        tags_data = tags_resp.json()
+                        avail_models = [m.get("name") for m in tags_data.get("models", [])]
+                        fallback_model = next((m for m in ["deepseek-r1:14b", "deepseek-r1:7b", "llama3.1:8b"] if m in avail_models), avail_models[0] if avail_models else None)
+                        if fallback_model:
+                            preferred_model = fallback_model
+                            response = requests.post(
+                                f"{target_ollama}/api/generate",
+                                json={"model": preferred_model, "prompt": prompt, "stream": False},
+                                timeout=45,
+                            )
+                except Exception:
+                    pass
+            response.raise_for_status()
+            raw_analysis = response.json().get("response", "")
+            if not raw_analysis and response.json().get("choices"):
+                raw_analysis = response.json()["choices"][0].get("message", {}).get("content", "")
+            # Clean <think> tags if emitted by DeepSeek-R1
+            analysis = re.sub(r"<think>.*?</think>", "", raw_analysis, flags=re.DOTALL).strip()
+            if not analysis:
+                analysis = raw_analysis.strip()
+            if not analysis:
+                return jsonify({"error": "The analysis model returned an empty response"}), 502
+        except requests.RequestException as e:
+            err_msg = str(e)
+            if hasattr(e, "response") and e.response is not None:
+                try:
+                    err_json = e.response.json()
+                    if "error" in err_json:
+                        err_msg = err_json["error"]
+                except Exception:
+                    err_msg = e.response.text or str(e)
+            return jsonify({"error": f"Analysis model is unavailable: {err_msg}"}), 502
+        except (ValueError, AttributeError) as e:
+            return jsonify({"error": f"Analysis model returned an invalid response: {str(e)}"}), 502
 
     return jsonify({
         "analysis": analysis,
