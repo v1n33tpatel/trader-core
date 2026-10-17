@@ -32,6 +32,54 @@ def test_existing_app_serves_dashboard_assets_and_backtest(module_name: str) -> 
     assert backtest.json["observations"] == 750
 
 
+def test_ux_ergonomic_features_served() -> None:
+    app = importlib.import_module("main").app
+    client = app.test_client()
+
+    dashboard = client.get("/")
+    stylesheet = client.get("/dashboard.css")
+    script = client.get("/dashboard.js")
+
+    assert dashboard.status_code == 200
+    html_text = dashboard.get_data(as_text=True)
+    # 1. Workspace View Switcher
+    assert "workspace-view-switcher" in html_text
+    assert "btn-view-portfolio" in html_text
+    assert "btn-view-quantlab" in html_text
+    assert "btn-view-all" in html_text
+    # 2. 1-Click Instant Scan & Breadcrumb Ribbon
+    assert "btn-wf-step1-autoscan" in html_text
+    assert "wf-breadcrumb-ribbon" in html_text
+    assert "btn-ribbon-jump-audit" in html_text
+    # 3. Candlestick Overlays
+    assert "chk-chart-overlays" in html_text
+    # 4. Floating Toast HUD
+    assert "toast-hud" in html_text
+    # 5. Command Palette & Shortcuts Modal
+    assert "command-palette-modal" in html_text
+    assert "cmd-palette-input" in html_text
+    assert "shortcuts-modal" in html_text
+    assert "btn-shortcuts-help" in html_text
+
+    # Verify CSS contains required classes
+    css_text = stylesheet.get_data(as_text=True)
+    assert ".workspace-view-switcher" in css_text
+    assert ".toast-hud-container" in css_text
+    assert ".cmd-palette-box" in css_text
+    assert ".shortcuts-modal-card" in css_text
+    assert ".wf-breadcrumb-ribbon" in css_text
+
+    # Verify JS contains core controllers and initializers
+    js_text = script.get_data(as_text=True)
+    assert "applyWorkspaceViewMode" in js_text
+    assert "runInstantAutoScan" in js_text
+    assert "showToast" in js_text
+    assert "initCommandPalette" in js_text
+    assert "initShortcutsModal" in js_text
+    assert "initGlobalShortcuts" in js_text
+    assert "COMMAND_REGISTRY" in js_text
+
+
 def test_api_status_reports_states_without_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
     class SuccessfulResponse:
         def raise_for_status(self) -> None:

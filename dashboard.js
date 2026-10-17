@@ -24,6 +24,180 @@ const agentForm = document.querySelector("#agent-form");
 const agentQuery = document.querySelector("#agent-query");
 const agentResponse = document.querySelector("#agent-response");
 const agentResponseText = document.querySelector("#agent-response-text");
+
+/* =========================================================================
+   FLOATING TOAST HUD NOTIFICATION SYSTEM
+   ========================================================================= */
+function showToast(message, type = "info", durationMs = 3500) {
+  const container = document.querySelector("#toast-hud");
+  if (!container) return;
+
+  const item = document.createElement("div");
+  item.className = `toast-item is-${type}`;
+
+  const iconMap = {
+    success: "✓",
+    warning: "⚠️",
+    error: "✕",
+    info: "⚡",
+  };
+  const icon = iconMap[type] || "ℹ️";
+
+  item.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <div class="toast-content">${message}</div>
+    <button type="button" class="toast-close" title="Dismiss">✕</button>
+  `;
+
+  item.querySelector(".toast-close")?.addEventListener("click", () => {
+    item.classList.add("is-hiding");
+    setTimeout(() => item.remove(), 200);
+  });
+
+  container.appendChild(item);
+
+  setTimeout(() => {
+    if (item.isConnected) {
+      item.classList.add("is-hiding");
+      setTimeout(() => item.remove(), 200);
+    }
+  }, durationMs);
+}
+
+/* =========================================================================
+   WORKSPACE VIEW SWITCHER (FOCUS MODES)
+   ========================================================================= */
+let currentViewMode = localStorage.getItem("mmm_view_mode") || "workflow";
+
+function applyWorkspaceViewMode(viewMode = currentViewMode) {
+  currentViewMode = viewMode;
+  try { localStorage.setItem("mmm_view_mode", viewMode); } catch (_) {}
+
+  // Update switcher buttons active state
+  document.querySelectorAll(".view-btn").forEach((btn) => {
+    btn.classList.toggle("is-active", btn.dataset.view === viewMode);
+  });
+
+  // If in admin or intel mode, don't override special tabs
+  if (currentBroker === "admin" || currentBroker === "intel") return;
+
+  const portfolioPanel = document.querySelector(".portfolio-panel");
+  const backtestPanel = document.querySelector(".backtest-panel");
+  const sizingPanel = document.querySelector(".sizing-panel");
+  const searchPanel = document.querySelector(".search-panel");
+  const agentPanel = document.querySelector(".agent-panel");
+  const wfCard = document.querySelector("#trade-workflow-card");
+  const autoCard = document.querySelector("#automation-card");
+  const metricsGrid = document.querySelector(".metrics-grid");
+  const holdingsHeading = document.querySelector(".holdings-heading");
+  const tableScroll = document.querySelector(".portfolio-panel .table-scroll");
+  const footnote = document.querySelector("#refresh-status");
+
+  // Form controls inside backtest panel
+  const marketForm = document.querySelector("#market-form");
+  const backtestForm = document.querySelector("#backtest-form");
+  const backtestStatus = document.querySelector("#backtest-status");
+  const backtestResults = document.querySelector("#backtest-results");
+  const marketChartFrame = document.querySelector("#market-chart-frame");
+
+  if (viewMode === "workflow") {
+    // 🎯 WORKFLOW FOCUS:
+    // Focus solely on the 8-Step Dual-Engine Workflow + Chart Preview
+    if (portfolioPanel) {
+      portfolioPanel.hidden = false;
+      if (wfCard) wfCard.hidden = false;
+      if (autoCard) autoCard.hidden = true;
+      if (metricsGrid) metricsGrid.hidden = true;
+      if (holdingsHeading) holdingsHeading.hidden = true;
+      if (tableScroll) tableScroll.hidden = true;
+      if (footnote) footnote.hidden = true;
+    }
+
+    if (backtestPanel) {
+      backtestPanel.hidden = false;
+      if (marketForm) marketForm.hidden = true;
+      if (backtestForm) backtestForm.hidden = true;
+      if (backtestStatus) backtestStatus.hidden = true;
+      if (backtestResults) backtestResults.hidden = true;
+      if (marketChartFrame) marketChartFrame.hidden = false;
+    }
+
+    if (sizingPanel) sizingPanel.hidden = true;
+    if (searchPanel) searchPanel.hidden = true;
+    if (agentPanel) agentPanel.hidden = true;
+
+  } else if (viewMode === "portfolio") {
+    // 📊 PORTFOLIO & EXECUTION:
+    // Show portfolio panel (metrics, holdings, automation card), hide workflow & research forms
+    if (portfolioPanel) {
+      portfolioPanel.hidden = false;
+      if (wfCard) wfCard.hidden = true;
+      if (autoCard) autoCard.hidden = false;
+      if (metricsGrid) metricsGrid.hidden = false;
+      if (holdingsHeading) holdingsHeading.hidden = false;
+      if (tableScroll) tableScroll.hidden = false;
+      if (footnote) footnote.hidden = false;
+    }
+
+    if (backtestPanel) backtestPanel.hidden = true;
+    if (sizingPanel) sizingPanel.hidden = true;
+    if (searchPanel) searchPanel.hidden = true;
+    if (agentPanel) agentPanel.hidden = true;
+
+  } else if (viewMode === "quantlab") {
+    // 🔬 QUANT LAB & CHARTS:
+    // Show full backtest panel, chart, volume profile, equity curve, and Kelly calculator
+    if (portfolioPanel) portfolioPanel.hidden = true;
+
+    if (backtestPanel) {
+      backtestPanel.hidden = false;
+      if (marketForm) marketForm.hidden = false;
+      if (backtestForm) backtestForm.hidden = false;
+      if (backtestStatus) backtestStatus.hidden = false;
+      if (marketChartFrame) marketChartFrame.hidden = false;
+    }
+    if (sizingPanel) sizingPanel.hidden = false;
+    if (searchPanel) searchPanel.hidden = true;
+    if (agentPanel) agentPanel.hidden = true;
+
+  } else {
+    // 🌐 ALL PANELS (Continuous layout)
+    if (portfolioPanel) {
+      portfolioPanel.hidden = false;
+      if (wfCard) wfCard.hidden = false;
+      if (autoCard) autoCard.hidden = false;
+      if (metricsGrid) metricsGrid.hidden = false;
+      if (holdingsHeading) holdingsHeading.hidden = false;
+      if (tableScroll) tableScroll.hidden = false;
+      if (footnote) footnote.hidden = false;
+    }
+    if (backtestPanel) {
+      backtestPanel.hidden = false;
+      if (marketForm) marketForm.hidden = false;
+      if (backtestForm) backtestForm.hidden = false;
+      if (backtestStatus) backtestStatus.hidden = false;
+      if (marketChartFrame) marketChartFrame.hidden = false;
+    }
+    if (sizingPanel) sizingPanel.hidden = false;
+    if (searchPanel) searchPanel.hidden = false;
+    if (agentPanel) agentPanel.hidden = false;
+  }
+}
+
+// Bind workspace view switcher buttons
+document.querySelectorAll(".view-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    applyWorkspaceViewMode(btn.dataset.view);
+    const modeLabels = {
+      workflow: "🎯 8-Step Workflow Focus",
+      portfolio: "📊 Portfolio Hub",
+      quantlab: "🔬 Quant Lab & Charts",
+      all: "🌐 Continuous Layout (All Panels)",
+    };
+    showToast(`View mode: ${modeLabels[btn.dataset.view] || btn.dataset.view}`, "info", 1500);
+  });
+});
+
 const BROKER_WATCHLIST_DEFAULTS = {
   t212: [
     { symbol: "AAPL", name: "Apple Inc.", type: "STOCK", sentiment: "+0.45", bias: "BULLISH" },
@@ -210,7 +384,7 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
 
     if (adminPanel) adminPanel.hidden = true;
     if (intelPanel) intelPanel.hidden = true;
-    standardPanels.forEach((p) => (p.hidden = false));
+    applyWorkspaceViewMode();
 
     const broker = brokerNames[currentBroker];
     portfolioTitle.textContent = `${broker} Portfolio`;
@@ -239,6 +413,7 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
     renderWatchlist();
     if (typeof renderWorkflowChips === "function") renderWorkflowChips(currentBroker);
     loadPortfolio(currentBroker);
+    showToast(`Switched to ${broker}`, "info", 1800);
   });
 });
 
@@ -928,6 +1103,79 @@ function drawMarketChart(bars, liquidity = null) {
       context.fillStyle = "#32d6ed";
       context.fillText(`VAL $${vp.val.toFixed(1)}`, right - 4, yVal + 10);
     }
+    context.setLineDash([]);
+  }
+
+  // Draw Structural Trade Geometry Overlays (Entry, Stop Loss, Take Profit, 50% CE / 200 SMA)
+  const chkOverlays = document.querySelector("#chk-chart-overlays");
+  if ((!chkOverlays || chkOverlays.checked) && typeof wfCurrentData !== "undefined" && wfCurrentData?.step_6_parameters) {
+    const p = wfCurrentData.step_6_parameters;
+    const s4 = wfCurrentData.step_4_analyze;
+    const entry = Number(p.entry_price || 0);
+    const sl = Number(p.stop_loss || 0);
+    const tp = Number(p.take_profit || 0);
+    const ce = Number(s4?.consequent_encroachment || s4?.sma_200 || 0);
+
+    // 1. 50% CE / 200 SMA (Purple dashed)
+    if (ce >= minimum && ce <= maximum) {
+      const yCe = Math.round(yAt(ce)) + 0.5;
+      context.strokeStyle = "rgba(168, 85, 247, 0.85)";
+      context.lineWidth = 1.2;
+      context.setLineDash([3, 3]);
+      context.beginPath();
+      context.moveTo(left, yCe);
+      context.lineTo(right, yCe);
+      context.stroke();
+      context.fillStyle = "#c084fc";
+      context.textAlign = "left";
+      context.fillText(`${wfCurrentData.asset_class === "ETF" ? "200 SMA" : "50% CE"} $${ce.toFixed(2)}`, left + 4, yCe - 4);
+    }
+
+    // 2. Entry Price (Emerald Green dashed)
+    if (entry >= minimum && entry <= maximum) {
+      const yEntry = Math.round(yAt(entry)) + 0.5;
+      context.strokeStyle = "rgba(16, 185, 129, 0.9)";
+      context.lineWidth = 1.5;
+      context.setLineDash([5, 4]);
+      context.beginPath();
+      context.moveTo(left, yEntry);
+      context.lineTo(right, yEntry);
+      context.stroke();
+      context.fillStyle = "#10b981";
+      context.textAlign = "right";
+      context.fillText(`ENTRY $${entry.toFixed(2)}`, right - 4, yEntry - 4);
+    }
+
+    // 3. Stop Loss (Coral Red solid)
+    if (sl >= minimum && sl <= maximum) {
+      const ySl = Math.round(yAt(sl)) + 0.5;
+      context.strokeStyle = "rgba(239, 68, 68, 0.9)";
+      context.lineWidth = 1.5;
+      context.setLineDash([]);
+      context.beginPath();
+      context.moveTo(left, ySl);
+      context.lineTo(right, ySl);
+      context.stroke();
+      context.fillStyle = "#f87171";
+      context.textAlign = "right";
+      context.fillText(`SL $${sl.toFixed(2)} (-${p.risk_pct}%)`, right - 4, ySl + 10);
+    }
+
+    // 4. Take Profit (Lime Green solid)
+    if (tp >= minimum && tp <= maximum) {
+      const yTp = Math.round(yAt(tp)) + 0.5;
+      context.strokeStyle = "rgba(34, 197, 94, 0.9)";
+      context.lineWidth = 1.5;
+      context.setLineDash([]);
+      context.beginPath();
+      context.moveTo(left, yTp);
+      context.lineTo(right, yTp);
+      context.stroke();
+      context.fillStyle = "#4ade80";
+      context.textAlign = "right";
+      context.fillText(`TARGET $${tp.toFixed(2)} (1:${p.risk_reward_ratio} R:R)`, right - 4, yTp - 4);
+    }
+
     context.setLineDash([]);
   }
 
@@ -2306,6 +2554,150 @@ function goToWorkflowStep(stepNum) {
   if (badge) badge.textContent = `STEP ${stepNum} OF 8`;
 }
 
+function renderWorkflowDetails(data) {
+  wfCurrentData = data;
+
+  // Step 1 Badge update
+  const pipeBadge = document.querySelector("#wf-pipeline-badge");
+  if (pipeBadge) {
+    const isMacro = data.execution_pipeline === "MACRO_DCA";
+    pipeBadge.innerHTML = `<span class="badge ${isMacro ? "badge-strat" : ""}">${isMacro ? "PIPELINE: MACRO DCA (ETF)" : "PIPELINE: INTRADAY STRUCTURAL"}</span>`;
+  }
+
+  // Step 2: Research
+  const scoreEl = document.querySelector("#wf-sentiment-score");
+  const badgeEl = document.querySelector("#wf-sentiment-badge");
+  const velEl = document.querySelector("#wf-mention-velocity");
+  const newsEl = document.querySelector("#wf-news-headline");
+  const newsSentEl = document.querySelector("#wf-news-sentiment");
+  const macroRiskEl = document.querySelector("#wf-macro-risk");
+  const macroDotEl = document.querySelector("#wf-macro-dot");
+
+  if (scoreEl) scoreEl.textContent = (data.step_2_research.sentiment_score > 0 ? "+" : "") + data.step_2_research.sentiment_score.toFixed(2);
+  if (badgeEl) {
+    badgeEl.textContent = data.step_2_research.sentiment_label;
+    badgeEl.className = data.step_2_research.sentiment_label === "BULLISH" ? "badge badge-strat" : "badge";
+  }
+  if (velEl) velEl.textContent = `${data.step_2_research.mention_velocity} mentions / hr · Institutional sentiment`;
+  if (newsEl) newsEl.textContent = data.step_2_research.headline;
+  if (newsSentEl) newsSentEl.textContent = `AI Sentiment: ${data.step_2_research.sentiment_label} ACCUMULATION`;
+  if (macroRiskEl) {
+    macroRiskEl.textContent = data.step_2_research.macro_risk_warning ? "HIGH RISK EVENT SOON" : "TIER-1 CLEAR (SAFE)";
+    macroRiskEl.style.color = data.step_2_research.macro_risk_warning ? "#ef4444" : "#10b981";
+  }
+  if (macroDotEl) {
+    macroDotEl.className = data.step_2_research.macro_risk_warning ? "status-dot status-dot-offline" : "status-dot status-dot-online";
+  }
+
+  // Step 3: Suggest
+  const setupName = document.querySelector("#wf-setup-name");
+  const setupBias = document.querySelector("#wf-setup-bias");
+  const setupConf = document.querySelector("#wf-setup-confidence");
+  const engineNote = document.querySelector("#wf-engine-note");
+  if (setupName) setupName.textContent = data.step_3_suggest.setup_name;
+  if (setupBias) {
+    setupBias.textContent = `BIAS: ${data.step_3_suggest.action}`;
+    setupBias.style.color = data.step_3_suggest.action === "BUY" ? "#10b981" : (data.step_3_suggest.action === "HOLD" ? "#eab308" : "#ef4444");
+  }
+  if (setupConf) setupConf.textContent = `CONFIDENCE: ${(data.step_3_suggest.confidence * 100).toFixed(0)}%`;
+  if (engineNote) engineNote.textContent = data.step_3_suggest.engine_note || "";
+
+  // Step 4: Analyze
+  const pHigh = document.querySelector("#wf-pivot-high");
+  const pLow = document.querySelector("#wf-pivot-low");
+  const poc = document.querySelector("#wf-poc");
+  const va = document.querySelector("#wf-va");
+  const fvg = document.querySelector("#wf-fvg");
+  const ce = document.querySelector("#wf-ce");
+  if (pHigh) pHigh.textContent = `$${data.step_4_analyze.pivot_high.toFixed(2)}`;
+  if (pLow) pLow.textContent = `$${data.step_4_analyze.pivot_low.toFixed(2)}`;
+  if (poc) poc.textContent = `$${data.step_4_analyze.point_of_control.toFixed(2)}`;
+  if (va) va.textContent = `$${data.step_4_analyze.value_area_low.toFixed(2)} - $${data.step_4_analyze.value_area_high.toFixed(2)}`;
+  if (fvg) fvg.textContent = `Retest $${data.step_4_analyze.fvg_zone[0].toFixed(2)} - $${data.step_4_analyze.fvg_zone[1].toFixed(2)}`;
+  if (ce) {
+    if (data.asset_class === "ETF") {
+      ce.textContent = `200 SMA $${data.step_4_analyze.sma_200.toFixed(2)}`;
+    } else {
+      ce.textContent = `50% CE $${data.step_4_analyze.consequent_encroachment.toFixed(2)}`;
+    }
+  }
+
+  // Step 5: Strategy
+  const stratTitle = document.querySelector("#wf-strat-title");
+  if (stratTitle) stratTitle.textContent = `${data.step_5_strategy.strategy_name} (${data.step_5_strategy.pipeline_type || data.step_5_strategy.category.toUpperCase()})`;
+
+  // Step 6: Parameters & Pre-Trade Audit
+  const pEntry = document.querySelector("#wf-param-entry");
+  const pStop = document.querySelector("#wf-param-stop");
+  const pRiskPct = document.querySelector("#wf-param-risk-pct");
+  const pTp = document.querySelector("#wf-param-tp");
+  const pRr = document.querySelector("#wf-param-rr");
+  const pSize = document.querySelector("#wf-param-size");
+  const pUnits = document.querySelector("#wf-param-units");
+  const pMaxLoss = document.querySelector("#wf-param-max-loss");
+  const pEquityBudget = document.querySelector("#wf-param-equity-budget");
+  const auditStatus = document.querySelector("#wf-audit-status");
+  const brokerBadge = document.querySelector("#wf-target-broker-badge");
+  const auditDetail = document.querySelector("#wf-audit-detail");
+
+  const p = data.step_6_parameters;
+  if (pEntry) pEntry.textContent = `$${p.entry_price.toFixed(p.entry_price < 10 ? 4 : 2)}`;
+  if (pStop) pStop.textContent = `$${p.stop_loss.toFixed(p.stop_loss < 10 ? 4 : 2)}`;
+  if (pRiskPct) pRiskPct.textContent = `-${p.risk_pct}% Risk (Under Invalidation Wick)`;
+  if (pTp) pTp.textContent = `$${p.take_profit.toFixed(p.take_profit < 10 ? 4 : 2)}`;
+  if (pRr) pRr.textContent = `Target R:R 1:${p.risk_reward_ratio} (≥ 1:2.0 Mandatory)`;
+  if (pSize) pSize.textContent = `$${p.recommended_size_usd.toFixed(2)}`;
+  if (pUnits) pUnits.textContent = `Units: ${p.recommended_units} · RiskSentinel Cap`;
+  if (pMaxLoss) pMaxLoss.textContent = `-$${p.max_loss_base_currency.toFixed(2)}`;
+  if (pEquityBudget) pEquityBudget.textContent = `Equity: $${p.equity.toFixed(2)} (2% = $${(p.equity * 0.02).toFixed(2)})`;
+  if (auditStatus) {
+    auditStatus.textContent = p.pre_trade_audit?.valid ? "PASSED" : "REJECTED";
+    auditStatus.className = p.pre_trade_audit?.valid ? "color-green" : "color-red";
+  }
+  if (brokerBadge) brokerBadge.textContent = `DESTINATION: ${p.target_broker.toUpperCase()}`;
+  if (auditDetail) {
+    auditDetail.textContent = `Capital preservation rule satisfied · Max loss bounded to $${p.max_loss_base_currency.toFixed(2)} (≤ 2.0% equity) · Order notional $${p.recommended_size_usd.toFixed(2)} (≤ $50.00 RiskSentinel limit) · Mandatory R:R 1:${p.risk_reward_ratio} verified.`;
+  }
+
+  // Update Breadcrumb Ribbon
+  const ribbon = document.querySelector("#wf-breadcrumb-ribbon");
+  if (ribbon) {
+    ribbon.hidden = false;
+    const rSym = document.querySelector("#ribbon-symbol");
+    if (rSym) rSym.textContent = data.symbol;
+    const rPipe = document.querySelector("#ribbon-pipeline");
+    if (rPipe) {
+      rPipe.textContent = data.execution_pipeline === "MACRO_DCA" ? "MACRO DCA (ETF)" : "INTRADAY STRUCTURAL";
+      rPipe.className = data.execution_pipeline === "MACRO_DCA" ? "badge badge-strat" : "badge";
+    }
+    const rBias = document.querySelector("#ribbon-bias");
+    if (rBias) {
+      rBias.textContent = `${data.step_3_suggest.action} · ${(data.step_3_suggest.confidence * 100).toFixed(0)}%`;
+      rBias.className = data.step_3_suggest.action === "BUY" ? "color-green" : "color-red";
+    }
+    const rLvl = document.querySelector("#ribbon-level");
+    if (rLvl) {
+      if (data.asset_class === "ETF") {
+        rLvl.textContent = `200 SMA $${data.step_4_analyze.sma_200.toFixed(2)}`;
+      } else {
+        rLvl.textContent = `50% CE $${data.step_4_analyze.consequent_encroachment.toFixed(2)}`;
+      }
+    }
+    const rRr = document.querySelector("#ribbon-rr");
+    if (rRr) rRr.textContent = `1:${data.step_6_parameters.risk_reward_ratio}`;
+    const rAud = document.querySelector("#ribbon-audit");
+    if (rAud) {
+      rAud.textContent = data.step_6_parameters.pre_trade_audit?.valid ? "PASSED" : "REJECTED";
+      rAud.className = data.step_6_parameters.pre_trade_audit?.valid ? "badge badge-strat color-green" : "badge color-red";
+    }
+  }
+
+  // Redraw chart overlays if chart has data
+  if (loadedMarketData) {
+    drawMarketChart(loadedMarketData.bars, loadedMarketData.liquidity);
+  }
+}
+
 async function loadWorkflowRecommendation(symbol) {
   wfCurrentSymbol = symbol.toUpperCase().trim();
   goToWorkflowStep(2);
@@ -2321,112 +2713,58 @@ async function loadWorkflowRecommendation(symbol) {
     });
     const data = await res.json();
     if (data.status !== "success") throw new Error(data.error || "Recommendation failed");
-    wfCurrentData = data;
-
-    // Step 1 Badge update
-    const pipeBadge = document.querySelector("#wf-pipeline-badge");
-    if (pipeBadge) {
-      const isMacro = data.execution_pipeline === "MACRO_DCA";
-      pipeBadge.innerHTML = `<span class="badge ${isMacro ? "badge-strat" : ""}">${isMacro ? "PIPELINE: MACRO DCA (ETF)" : "PIPELINE: INTRADAY STRUCTURAL"}</span>`;
-    }
-
-    // Step 2: Research
-    const scoreEl = document.querySelector("#wf-sentiment-score");
-    const badgeEl = document.querySelector("#wf-sentiment-badge");
-    const velEl = document.querySelector("#wf-mention-velocity");
-    const newsEl = document.querySelector("#wf-news-headline");
-    const newsSentEl = document.querySelector("#wf-news-sentiment");
-    const macroRiskEl = document.querySelector("#wf-macro-risk");
-    const macroDotEl = document.querySelector("#wf-macro-dot");
-
-    if (scoreEl) scoreEl.textContent = (data.step_2_research.sentiment_score > 0 ? "+" : "") + data.step_2_research.sentiment_score.toFixed(2);
-    if (badgeEl) {
-      badgeEl.textContent = data.step_2_research.sentiment_label;
-      badgeEl.className = data.step_2_research.sentiment_label === "BULLISH" ? "badge badge-strat" : "badge";
-    }
-    if (velEl) velEl.textContent = `${data.step_2_research.mention_velocity} mentions / hr · Institutional sentiment`;
-    if (newsEl) newsEl.textContent = data.step_2_research.headline;
-    if (newsSentEl) newsSentEl.textContent = `AI Sentiment: ${data.step_2_research.sentiment_label} ACCUMULATION`;
-    if (macroRiskEl) {
-      macroRiskEl.textContent = data.step_2_research.macro_risk_warning ? "HIGH RISK EVENT SOON" : "TIER-1 CLEAR (SAFE)";
-      macroRiskEl.style.color = data.step_2_research.macro_risk_warning ? "#ef4444" : "#10b981";
-    }
-    if (macroDotEl) {
-      macroDotEl.className = data.step_2_research.macro_risk_warning ? "status-dot status-dot-offline" : "status-dot status-dot-online";
-    }
-
-    // Step 3: Suggest
-    const setupName = document.querySelector("#wf-setup-name");
-    const setupBias = document.querySelector("#wf-setup-bias");
-    const setupConf = document.querySelector("#wf-setup-confidence");
-    const engineNote = document.querySelector("#wf-engine-note");
-    if (setupName) setupName.textContent = data.step_3_suggest.setup_name;
-    if (setupBias) {
-      setupBias.textContent = `BIAS: ${data.step_3_suggest.action}`;
-      setupBias.style.color = data.step_3_suggest.action === "BUY" ? "#10b981" : (data.step_3_suggest.action === "HOLD" ? "#eab308" : "#ef4444");
-    }
-    if (setupConf) setupConf.textContent = `CONFIDENCE: ${(data.step_3_suggest.confidence * 100).toFixed(0)}%`;
-    if (engineNote) engineNote.textContent = data.step_3_suggest.engine_note || "";
-
-    // Step 4: Analyze
-    const pHigh = document.querySelector("#wf-pivot-high");
-    const pLow = document.querySelector("#wf-pivot-low");
-    const poc = document.querySelector("#wf-poc");
-    const va = document.querySelector("#wf-va");
-    const fvg = document.querySelector("#wf-fvg");
-    const ce = document.querySelector("#wf-ce");
-    if (pHigh) pHigh.textContent = `$${data.step_4_analyze.pivot_high.toFixed(2)}`;
-    if (pLow) pLow.textContent = `$${data.step_4_analyze.pivot_low.toFixed(2)}`;
-    if (poc) poc.textContent = `$${data.step_4_analyze.point_of_control.toFixed(2)}`;
-    if (va) va.textContent = `$${data.step_4_analyze.value_area_low.toFixed(2)} - $${data.step_4_analyze.value_area_high.toFixed(2)}`;
-    if (fvg) fvg.textContent = `Retest $${data.step_4_analyze.fvg_zone[0].toFixed(2)} - $${data.step_4_analyze.fvg_zone[1].toFixed(2)}`;
-    if (ce) {
-      if (data.asset_class === "ETF") {
-        ce.textContent = `200 SMA $${data.step_4_analyze.sma_200.toFixed(2)}`;
-      } else {
-        ce.textContent = `50% CE $${data.step_4_analyze.consequent_encroachment.toFixed(2)}`;
-      }
-    }
-
-    // Step 5: Strategy
-    const stratTitle = document.querySelector("#wf-strat-title");
-    if (stratTitle) stratTitle.textContent = `${data.step_5_strategy.strategy_name} (${data.step_5_strategy.pipeline_type || data.step_5_strategy.category.toUpperCase()})`;
-
-    // Step 6: Parameters & Pre-Trade Audit
-    const pEntry = document.querySelector("#wf-param-entry");
-    const pStop = document.querySelector("#wf-param-stop");
-    const pRiskPct = document.querySelector("#wf-param-risk-pct");
-    const pTp = document.querySelector("#wf-param-tp");
-    const pRr = document.querySelector("#wf-param-rr");
-    const pSize = document.querySelector("#wf-param-size");
-    const pUnits = document.querySelector("#wf-param-units");
-    const pMaxLoss = document.querySelector("#wf-param-max-loss");
-    const pEquityBudget = document.querySelector("#wf-param-equity-budget");
-    const auditStatus = document.querySelector("#wf-audit-status");
-    const brokerBadge = document.querySelector("#wf-target-broker-badge");
-    const auditDetail = document.querySelector("#wf-audit-detail");
-
-    const p = data.step_6_parameters;
-    if (pEntry) pEntry.textContent = `$${p.entry_price.toFixed(p.entry_price < 10 ? 4 : 2)}`;
-    if (pStop) pStop.textContent = `$${p.stop_loss.toFixed(p.stop_loss < 10 ? 4 : 2)}`;
-    if (pRiskPct) pRiskPct.textContent = `-${p.risk_pct}% Risk (Under Invalidation Wick)`;
-    if (pTp) pTp.textContent = `$${p.take_profit.toFixed(p.take_profit < 10 ? 4 : 2)}`;
-    if (pRr) pRr.textContent = `Target R:R 1:${p.risk_reward_ratio} (≥ 1:2.0 Mandatory)`;
-    if (pSize) pSize.textContent = `$${p.recommended_size_usd.toFixed(2)}`;
-    if (pUnits) pUnits.textContent = `Units: ${p.recommended_units} · RiskSentinel Cap`;
-    if (pMaxLoss) pMaxLoss.textContent = `-$${p.max_loss_base_currency.toFixed(2)}`;
-    if (pEquityBudget) pEquityBudget.textContent = `Equity: $${p.equity.toFixed(2)} (2% = $${(p.equity * 0.02).toFixed(2)})`;
-    if (auditStatus) {
-      auditStatus.textContent = p.pre_trade_audit?.valid ? "PASSED" : "REJECTED";
-      auditStatus.className = p.pre_trade_audit?.valid ? "color-green" : "color-red";
-    }
-    if (brokerBadge) brokerBadge.textContent = `DESTINATION: ${p.target_broker.toUpperCase()}`;
-    if (auditDetail) {
-      auditDetail.textContent = `Capital preservation rule satisfied · Max loss bounded to $${p.max_loss_base_currency.toFixed(2)} (≤ 2.0% equity) · Order notional $${p.recommended_size_usd.toFixed(2)} (≤ $50.00 RiskSentinel limit) · Mandatory R:R 1:${p.risk_reward_ratio} verified.`;
-    }
-
+    renderWorkflowDetails(data);
   } catch (err) {
     if (headline) headline.textContent = `Error loading workflow intel: ${err.message}`;
+    showToast(`Workflow error: ${err.message}`, "error");
+  }
+}
+
+async function runInstantAutoScan(symbol) {
+  const sym = (symbol || wfCurrentSymbol || "ETHUSDT").toUpperCase().trim();
+  wfCurrentSymbol = sym;
+  const input = document.querySelector("#wf-symbol-input");
+  if (input) input.value = sym;
+
+  const btnAuto = document.querySelector("#btn-wf-step1-autoscan");
+  if (btnAuto) {
+    btnAuto.disabled = true;
+    btnAuto.innerHTML = `<span>⏳ Scanning...</span>`;
+  }
+  showToast(`⚡ Instant Scan: Analyzing ${sym} across dual-engine pipeline...`, "info", 2000);
+
+  try {
+    const res = await fetch("/api/workflow/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: sym, broker: currentBroker }),
+    });
+    const data = await res.json();
+    if (data.status !== "success") throw new Error(data.error || "Recommendation failed");
+
+    renderWorkflowDetails(data);
+
+    // Jump directly to Step 6 Pre-Trade Parameters & Audit!
+    goToWorkflowStep(6);
+
+    // Auto-load symbol on chart
+    const symInput = document.querySelector("#market-symbol");
+    const provSelect = document.querySelector("#market-provider");
+    if (symInput) symInput.value = sym;
+    if (provSelect) {
+      provSelect.value = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "AVAXUSDT"].some((k) => sym.includes(k)) ? "binance" : "yahoo";
+    }
+    document.querySelector("#load-market-data")?.click();
+
+    showToast(`✓ Pre-Trade Audit Verified: Entry $${data.step_6_parameters.entry_price.toFixed(2)} | SL $${data.step_6_parameters.stop_loss.toFixed(2)} | Target 1:${data.step_6_parameters.risk_reward_ratio}`, "success", 4000);
+
+  } catch (err) {
+    showToast(`Auto-Scan failed: ${err.message}`, "error", 4000);
+  } finally {
+    if (btnAuto) {
+      btnAuto.disabled = false;
+      btnAuto.innerHTML = `<span>⚡ 1-Click Instant Scan</span>`;
+    }
   }
 }
 
@@ -2468,6 +2806,36 @@ function initWorkflowController() {
   if (btnReset) {
     btnReset.addEventListener("click", () => {
       goToWorkflowStep(1);
+    });
+  }
+
+  // 1-Click Instant Auto-Scan
+  const btnAutoScan = document.querySelector("#btn-wf-step1-autoscan");
+  if (btnAutoScan) {
+    btnAutoScan.addEventListener("click", () => {
+      const input = document.querySelector("#wf-symbol-input");
+      const sym = input?.value.trim() || wfCurrentSymbol || "ETHUSDT";
+      runInstantAutoScan(sym);
+    });
+  }
+
+  // Ribbon Jump to Audit
+  const btnRibbonAudit = document.querySelector("#btn-ribbon-jump-audit");
+  if (btnRibbonAudit) {
+    btnRibbonAudit.addEventListener("click", () => {
+      goToWorkflowStep(6);
+      document.querySelector("#trade-workflow-card")?.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  // Chart Overlays Toggle
+  const chkOverlays = document.querySelector("#chk-chart-overlays");
+  if (chkOverlays) {
+    chkOverlays.addEventListener("change", () => {
+      if (loadedMarketData) {
+        drawMarketChart(loadedMarketData.bars, loadedMarketData.liquidity);
+      }
+      showToast(`Chart geometry overlays: ${chkOverlays.checked ? "ENABLED" : "DISABLED"}`, "info", 1500);
     });
   }
 
@@ -2552,9 +2920,11 @@ function initWorkflowController() {
           wfDemoMsg.textContent = `✓ Demo Order Executed (${d.order_id}): ${payload.side} ${payload.symbol}`;
           wfDemoMsg.className = "status-msg color-green";
         }
+        showToast(`✓ Demo Order Executed: ${payload.side} ${payload.symbol} (${d.order_id})`, "success", 4000);
         loadPortfolio(currentBroker);
       } catch (err) {
         if (wfDemoMsg) wfDemoMsg.textContent = `Failed: ${err.message}`;
+        showToast(`Demo order failed: ${err.message}`, "error", 4000);
       }
     });
   }
@@ -2576,6 +2946,7 @@ function initWorkflowController() {
               wfLiveMsg.textContent = `🚀 Live Order Armed for ${wfCurrentSymbol} on ${currentBroker.toUpperCase()}`;
               wfLiveMsg.className = "status-msg color-green";
             }
+            showToast(`🚀 Live Order Armed: ${wfCurrentSymbol} on ${currentBroker.toUpperCase()}`, "success", 4000);
           };
         }
       }
@@ -2832,8 +3203,294 @@ function initAdminControls() {
   }
 }
 
+
+/* =========================================================================
+   7. PRO COMMAND PALETTE (Ctrl+K / ⌘K) & GLOBAL SHORTCUTS
+   ========================================================================= */
+
+function selectBrokerTab(brokerKey) {
+  const tab = document.querySelector(`.broker-tab[data-broker="${brokerKey}"]`);
+  if (tab) tab.click();
+}
+
+const COMMAND_REGISTRY = [
+  // Focus View Modes
+  { id: "view_workflow", title: "Switch to 🎯 8-Step Workflow View", category: "View Mode", shortcut: "1", action: () => applyWorkspaceViewMode("workflow") },
+  { id: "view_portfolio", title: "Switch to 📊 Portfolio Hub View", category: "View Mode", shortcut: "2", action: () => applyWorkspaceViewMode("portfolio") },
+  { id: "view_quantlab", title: "Switch to 🔬 Quant Lab & Charts View", category: "View Mode", shortcut: "3", action: () => applyWorkspaceViewMode("quantlab") },
+  { id: "view_all", title: "Switch to 🌐 All Panels (Continuous Layout)", category: "View Mode", shortcut: "4", action: () => applyWorkspaceViewMode("all") },
+
+  // Instant Auto-Scans
+  { id: "scan_eth", title: "⚡ Instant Auto-Scan: ETHUSDT (Intraday Structural)", category: "Auto-Scan", keyword: "eth ethereum crypto", action: () => runInstantAutoScan("ETHUSDT") },
+  { id: "scan_btc", title: "⚡ Instant Auto-Scan: BTCUSDT (Intraday Structural)", category: "Auto-Scan", keyword: "btc bitcoin crypto", action: () => runInstantAutoScan("BTCUSDT") },
+  { id: "scan_sol", title: "⚡ Instant Auto-Scan: SOLUSDT (Intraday Structural)", category: "Auto-Scan", keyword: "sol solana crypto", action: () => runInstantAutoScan("SOLUSDT") },
+  { id: "scan_eqqq", title: "⚡ Instant Auto-Scan: EQQQ.L (Macro DCA ETF - LSE)", category: "Auto-Scan", keyword: "eqqq qqq nasdaq etf t212", action: () => runInstantAutoScan("EQQQ.L") },
+  { id: "scan_vuke", title: "⚡ Instant Auto-Scan: VUKE.L (Macro DCA FTSE 100)", category: "Auto-Scan", keyword: "vuke ftse etf t212", action: () => runInstantAutoScan("VUKE.L") },
+  { id: "scan_eurusd", title: "⚡ Instant Auto-Scan: EURUSD (Forex London/NY)", category: "Auto-Scan", keyword: "eur usd forex ctrader", action: () => runInstantAutoScan("EURUSD") },
+  { id: "scan_xauusd", title: "⚡ Instant Auto-Scan: XAUUSD (Gold Imbalance Retest)", category: "Auto-Scan", keyword: "gold commodity xau ctrader", action: () => runInstantAutoScan("XAUUSD") },
+  { id: "scan_nvda", title: "⚡ Instant Auto-Scan: NVDA (US Tech Structural)", category: "Auto-Scan", keyword: "nvda nvidia stock equities", action: () => runInstantAutoScan("NVDA") },
+
+  // Broker Routing Tabs
+  { id: "broker_binance", title: "Select Broker: Binance Spot Crypto", category: "Brokers", keyword: "binance btc eth crypto", action: () => selectBrokerTab("binance") },
+  { id: "broker_t212", title: "Select Broker: Trading 212 (Invest / ISA)", category: "Brokers", keyword: "t212 stocks etfs eqqq", action: () => selectBrokerTab("t212") },
+  { id: "broker_etoro", title: "Select Broker: eToro Multi-Asset Demo", category: "Brokers", keyword: "etoro demo copy portfolio", action: () => selectBrokerTab("etoro") },
+  { id: "broker_kraken", title: "Select Broker: Kraken Spot Crypto", category: "Brokers", keyword: "kraken btc eth crypto", action: () => selectBrokerTab("kraken") },
+  { id: "broker_ctrader", title: "Select Broker: cTrader Open API Forex", category: "Brokers", keyword: "ctrader forex eurusd xauusd", action: () => selectBrokerTab("ctrader") },
+  { id: "broker_quantai", title: "Select Broker: Quant AI Engine", category: "Brokers", keyword: "ai copilot orchestrator", action: () => selectBrokerTab("quantai") },
+  { id: "broker_admin", title: "Admin Portal: RiskSentinel & Audit Ledger", category: "Brokers", keyword: "admin ledger bounds store", action: () => selectBrokerTab("admin") },
+
+  // Actions & Utilities
+  { id: "toggle_copilot", title: "Toggle AI Quant Copilot Window", category: "Tools", shortcut: "C", action: () => document.querySelector("#btn-topbar-copilot")?.click() },
+  { id: "refresh_portfolio", title: "Refresh Active Broker Portfolio & Balances", category: "Tools", shortcut: "R", action: () => { loadPortfolio(currentBroker); showToast(`Refreshed ${currentBroker.toUpperCase()} portfolio`, "info", 1500); } },
+  { id: "toggle_overlays", title: "Toggle Candlestick Geometry Overlays (SL/TP/CE)", category: "Chart", shortcut: "O", action: () => {
+    const chk = document.querySelector("#chk-chart-overlays");
+    if (chk) {
+      chk.checked = !chk.checked;
+      chk.dispatchEvent(new Event("change"));
+    }
+  }},
+  { id: "toggle_mode", title: "Toggle Demo / Real Capital Mode", category: "Execution", shortcut: "M", action: () => document.querySelector("#mode-toggle-btn")?.click() },
+  { id: "shortcuts_help", title: "Open Keyboard Shortcuts Cheat Sheet", category: "Help", shortcut: "?", action: () => openShortcutsModal() },
+];
+
+let cmdSelectedIndex = 0;
+let currentFilteredCommands = [...COMMAND_REGISTRY];
+
+function openCommandPalette() {
+  const modal = document.querySelector("#command-palette-modal");
+  const input = document.querySelector("#cmd-palette-input");
+  if (!modal || !input) return;
+
+  modal.hidden = false;
+  input.value = "";
+  renderCommandPaletteResults("");
+  input.focus();
+}
+
+function closeCommandPalette() {
+  const modal = document.querySelector("#command-palette-modal");
+  if (modal) modal.hidden = true;
+}
+
+function renderCommandPaletteResults(query = "") {
+  const container = document.querySelector("#cmd-palette-results");
+  if (!container) return;
+
+  const q = query.trim().toLowerCase();
+  currentFilteredCommands = COMMAND_REGISTRY.filter((cmd) => {
+    if (!q) return true;
+    return (
+      cmd.title.toLowerCase().includes(q) ||
+      cmd.category.toLowerCase().includes(q) ||
+      (cmd.keyword && cmd.keyword.toLowerCase().includes(q))
+    );
+  });
+
+  cmdSelectedIndex = 0;
+  container.innerHTML = "";
+
+  if (currentFilteredCommands.length === 0) {
+    container.innerHTML = '<div class="cmd-item" style="cursor:default;opacity:0.6;"><span>No matching commands or assets found.</span></div>';
+    return;
+  }
+
+  currentFilteredCommands.forEach((cmd, idx) => {
+    const item = document.createElement("div");
+    item.className = `cmd-item ${idx === cmdSelectedIndex ? "is-active" : ""}`;
+    item.dataset.index = String(idx);
+
+    let icon = "⚡";
+    if (cmd.category === "View Mode") icon = "🎯";
+    else if (cmd.category === "Auto-Scan") icon = "🔍";
+    else if (cmd.category === "Brokers") icon = "🏦";
+    else if (cmd.category === "Tools") icon = "🛠";
+    else if (cmd.category === "Chart") icon = "📈";
+    else if (cmd.category === "Execution") icon = "🛡";
+
+    item.innerHTML = `
+      <div class="cmd-item-left">
+        <span class="cmd-item-icon">${icon}</span>
+        <div>
+          <span class="cmd-item-title">${cmd.title}</span>
+          <span class="cmd-item-sub">${cmd.category}</span>
+        </div>
+      </div>
+      ${cmd.shortcut ? `<span class="cmd-item-badge"><kbd>${cmd.shortcut}</kbd></span>` : `<span class="cmd-item-badge">ENTER</span>`}
+    `;
+
+    item.addEventListener("click", () => {
+      closeCommandPalette();
+      cmd.action();
+    });
+
+    item.addEventListener("mouseenter", () => {
+      cmdSelectedIndex = idx;
+      container.querySelectorAll(".cmd-item").forEach((el, i) => {
+        el.classList.toggle("is-active", i === cmdSelectedIndex);
+      });
+    });
+
+    container.appendChild(item);
+  });
+}
+
+function updateCommandPaletteSelection(newIndex) {
+  const container = document.querySelector("#cmd-palette-results");
+  const items = container?.querySelectorAll(".cmd-item") || [];
+  if (!items.length) return;
+
+  cmdSelectedIndex = (newIndex + items.length) % items.length;
+  items.forEach((item, idx) => {
+    const isActive = idx === cmdSelectedIndex;
+    item.classList.toggle("is-active", isActive);
+    if (isActive) {
+      item.scrollIntoView({ block: "nearest" });
+    }
+  });
+}
+
+function initCommandPalette() {
+  const modal = document.querySelector("#command-palette-modal");
+  const input = document.querySelector("#cmd-palette-input");
+  const btnClose = document.querySelector("#btn-close-cmd-palette");
+  const btnTrigger = document.querySelector("#btn-trigger-cmd-k");
+
+  if (!modal || !input) return;
+
+  btnTrigger?.addEventListener("click", openCommandPalette);
+  btnClose?.addEventListener("click", closeCommandPalette);
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeCommandPalette();
+  });
+
+  input.addEventListener("input", () => {
+    renderCommandPaletteResults(input.value);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      updateCommandPaletteSelection(cmdSelectedIndex + 1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      updateCommandPaletteSelection(cmdSelectedIndex - 1);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (currentFilteredCommands[cmdSelectedIndex]) {
+        const cmd = currentFilteredCommands[cmdSelectedIndex];
+        closeCommandPalette();
+        cmd.action();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeCommandPalette();
+    }
+  });
+}
+
+function openShortcutsModal() {
+  const modal = document.querySelector("#shortcuts-modal");
+  if (modal) modal.hidden = false;
+}
+
+function closeShortcutsModal() {
+  const modal = document.querySelector("#shortcuts-modal");
+  if (modal) modal.hidden = true;
+}
+
+function initShortcutsModal() {
+  const modal = document.querySelector("#shortcuts-modal");
+  const btnClose = document.querySelector("#btn-close-shortcuts");
+  const btnHelp = document.querySelector("#btn-shortcuts-help");
+
+  btnHelp?.addEventListener("click", openShortcutsModal);
+  btnClose?.addEventListener("click", closeShortcutsModal);
+
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) closeShortcutsModal();
+  });
+}
+
+function initGlobalShortcuts() {
+  document.addEventListener("keydown", (e) => {
+    const isInputActive = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+    const cmdPaletteModal = document.querySelector("#command-palette-modal");
+    const isCmdPaletteOpen = cmdPaletteModal && !cmdPaletteModal.hidden;
+    const shortcutsModal = document.querySelector("#shortcuts-modal");
+    const isShortcutsOpen = shortcutsModal && !shortcutsModal.hidden;
+
+    // Ctrl+K / Cmd+K toggle
+    if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+      e.preventDefault();
+      if (isCmdPaletteOpen) {
+        closeCommandPalette();
+      } else {
+        openCommandPalette();
+      }
+      return;
+    }
+
+    // Escape closes modals
+    if (e.key === "Escape") {
+      if (isCmdPaletteOpen) {
+        closeCommandPalette();
+        return;
+      }
+      if (isShortcutsOpen) {
+        closeShortcutsModal();
+        return;
+      }
+      const realModal = document.querySelector("#real-mode-modal");
+      if (realModal && !realModal.hidden) {
+        realModal.hidden = true;
+        return;
+      }
+      const copilotWin = document.querySelector("#copilot-window");
+      if (copilotWin && !copilotWin.hidden && document.activeElement?.id === "copilot-input") {
+        copilotWin.hidden = true;
+        return;
+      }
+    }
+
+    // Do NOT trigger single-key navigation if typing in an input or textarea
+    if (isInputActive) return;
+
+    if (e.key === "/") {
+      e.preventDefault();
+      openCommandPalette();
+    } else if (e.key === "?") {
+      e.preventDefault();
+      openShortcutsModal();
+    } else if (e.key === "1") {
+      applyWorkspaceViewMode("workflow");
+      showToast("View mode: 🎯 8-Step Workflow", "info", 1500);
+    } else if (e.key === "2") {
+      applyWorkspaceViewMode("portfolio");
+      showToast("View mode: 📊 Portfolio Hub", "info", 1500);
+    } else if (e.key === "3") {
+      applyWorkspaceViewMode("quantlab");
+      showToast("View mode: 🔬 Quant Lab & Charts", "info", 1500);
+    } else if (e.key === "4") {
+      applyWorkspaceViewMode("all");
+      showToast("View mode: 🌐 Continuous Layout (All Panels)", "info", 1500);
+    } else if (e.key === "c" || e.key === "C") {
+      document.querySelector("#btn-topbar-copilot")?.click();
+    } else if (e.key === "r" || e.key === "R") {
+      loadPortfolio(currentBroker);
+      showToast(`Refreshed ${currentBroker.toUpperCase()} portfolio`, "info", 1500);
+    } else if (e.key === "m" || e.key === "M") {
+      document.querySelector("#mode-toggle-btn")?.click();
+    }
+  });
+}
+
 // Global initialization of new workflow & copilot modules
 initWorkflowController();
 initQuantCopilot();
 initAdminControls();
+initCommandPalette();
+initShortcutsModal();
+initGlobalShortcuts();
+applyWorkspaceViewMode();
 renderWatchlist();

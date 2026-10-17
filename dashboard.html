@@ -96,7 +96,33 @@
         <button class="broker-tab broker-tab-admin" id="tab-admin" type="button" role="tab" aria-selected="false" data-broker="admin">⚙ Admin &amp; Control</button>
       </nav>
 
-
+      <!-- WORKSPACE FOCUS VIEW SWITCHER -->
+      <div class="workspace-view-switcher" role="tablist" aria-label="Workspace View Modes">
+        <div class="view-switcher-group">
+          <span class="view-switcher-label">WORKSPACE VIEW:</span>
+          <button type="button" class="view-btn is-active" id="btn-view-workflow" data-view="workflow" title="Focused 8-step quantitative trading workflow">
+            <span class="view-icon">🎯</span> 8-Step Workflow
+          </button>
+          <button type="button" class="view-btn" id="btn-view-portfolio" data-view="portfolio" title="Live broker portfolio snapshot, active positions & execution">
+            <span class="view-icon">📊</span> Portfolio Hub
+          </button>
+          <button type="button" class="view-btn" id="btn-view-quantlab" data-view="quantlab" title="Candlestick charts, volume profile & quantitative backtesting">
+            <span class="view-icon">🔬</span> Quant Lab &amp; Charts
+          </button>
+          <button type="button" class="view-btn" id="btn-view-all" data-view="all" title="Full continuous workstation layout">
+            <span class="view-icon">🌐</span> All Panels
+          </button>
+        </div>
+        <div class="view-switcher-actions">
+          <button type="button" class="cmd-k-trigger-pill" id="btn-trigger-cmd-k" title="Open Command Palette (Ctrl+K or /)">
+            <span class="cmd-k-badge">⌘K</span>
+            <span class="cmd-k-text">Command Palette</span>
+          </button>
+          <button type="button" class="shortcuts-help-btn" id="btn-shortcuts-help" title="Keyboard Shortcuts Cheat Sheet (?)">
+            <span class="shortcuts-icon">⌨</span>
+          </button>
+        </div>
+      </div>
 
       <main>
         <section class="panel portfolio-panel" aria-labelledby="portfolio-title">
@@ -161,6 +187,37 @@
               </button>
             </div>
 
+            <!-- Workflow Active Breadcrumb Ribbon (Appears when an asset is scanned) -->
+            <div class="wf-breadcrumb-ribbon" id="wf-breadcrumb-ribbon" hidden>
+              <div class="ribbon-item">
+                <span class="ribbon-lbl">ACTIVE ASSET</span>
+                <strong id="ribbon-symbol">BTCUSDT</strong>
+              </div>
+              <div class="ribbon-item">
+                <span class="ribbon-lbl">PIPELINE</span>
+                <span class="badge badge-strat" id="ribbon-pipeline">INTRADAY STRUCTURAL</span>
+              </div>
+              <div class="ribbon-item">
+                <span class="ribbon-lbl">BIAS &amp; CONFIDENCE</span>
+                <strong id="ribbon-bias" class="color-green">BUY · 85%</strong>
+              </div>
+              <div class="ribbon-item">
+                <span class="ribbon-lbl">STRUCTURAL LEVEL</span>
+                <strong id="ribbon-level" class="color-purple">50% CE $67,200.00</strong>
+              </div>
+              <div class="ribbon-item">
+                <span class="ribbon-lbl">MANDATORY R:R</span>
+                <strong id="ribbon-rr" class="color-gold">1:2.20</strong>
+              </div>
+              <div class="ribbon-item">
+                <span class="ribbon-lbl">PRE-TRADE AUDIT</span>
+                <span id="ribbon-audit" class="badge badge-strat color-green">PASSED</span>
+              </div>
+              <button type="button" class="ribbon-jump-btn" id="btn-ribbon-jump-audit" title="Jump directly to Step 6 Pre-Trade Parameters &amp; Audit">
+                Audit Parameters ➔
+              </button>
+            </div>
+
             <!-- Workflow Step Content Panels -->
             <div class="workflow-panels-container">
               <!-- STEP 1: Find Product -->
@@ -190,7 +247,10 @@
                 <div class="wf-symbol-input-row">
                   <input type="text" id="wf-symbol-input" class="search-input" placeholder="Or enter custom ticker (e.g. BTCUSDT, EQQQ.L, NVDA, EURUSD)..." autocomplete="off" />
                   <button type="button" class="button button-primary" id="btn-wf-step1-next">
-                    <span>⚡ Research Instrument ➔</span>
+                    <span>Research ➔</span>
+                  </button>
+                  <button type="button" class="button button-gold" id="btn-wf-step1-autoscan" title="Execute full 8-step scan and jump directly to pre-trade audit">
+                    <span>⚡ 1-Click Instant Scan</span>
                   </button>
                 </div>
               </div>
@@ -616,6 +676,10 @@
             <div class="chart-heading">
               <span>HISTORICAL CLOSE &amp; VOLUME PROFILE</span>
               <div class="chart-heading-actions">
+                <label class="chart-overlay-toggle" title="Toggle Structural Level Overlays (Entry, SL, TP, FVG CE, POC)">
+                  <input type="checkbox" id="chk-chart-overlays" checked />
+                  <span>📐 Trade Geometry Overlays</span>
+                </label>
                 <span id="live-ws-badge" class="ws-live-badge" hidden><span class="ws-dot"></span>LIVE WS</span>
                 <span id="market-chart-count">—</span>
               </div>
@@ -1700,6 +1764,55 @@
           <input type="text" id="copilot-input" class="copilot-input-field" placeholder="Ask about BTC, AAPL, EURUSD, Twitter sentiment..." autocomplete="off" />
           <button type="submit" id="btn-copilot-send" class="copilot-send-btn">➔</button>
         </form>
+      </div>
+    </div>
+
+    <!-- FLOATING TOAST HUD NOTIFICATION CONTAINER -->
+    <div id="toast-hud" class="toast-hud-container" aria-live="polite"></div>
+
+    <!-- COMMAND PALETTE (Ctrl+K / ⌘K) MODAL -->
+    <div id="command-palette-modal" class="cmd-modal-backdrop" hidden>
+      <div class="cmd-palette-box" role="dialog" aria-modal="true" aria-labelledby="cmd-palette-label">
+        <span id="cmd-palette-label" class="sr-only">Command Palette</span>
+        <div class="cmd-palette-input-wrap">
+          <span class="cmd-palette-icon">⌕</span>
+          <input type="text" id="cmd-palette-input" placeholder="Search instruments, switch brokers, or run commands (e.g. BTC, EQQQ, Demo, Scan)..." autocomplete="off" />
+          <button type="button" class="cmd-esc-badge" id="btn-close-cmd-palette">ESC</button>
+        </div>
+        <div class="cmd-palette-results" id="cmd-palette-results">
+          <!-- Dynamically populated -->
+        </div>
+        <div class="cmd-palette-footer">
+          <div class="cmd-hints">
+            <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+            <span><kbd>↵</kbd> Select</span>
+            <span><kbd>ESC</kbd> Close</span>
+          </div>
+          <span class="cmd-branding">QUANT PALETTE · QWERTY CORP</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- KEYBOARD SHORTCUTS CHEAT SHEET (?) MODAL -->
+    <div id="shortcuts-modal" class="modal-backdrop" hidden>
+      <div class="modal-card shortcuts-modal-card" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+        <div class="modal-header">
+          <span class="modal-warning-icon">⌨</span>
+          <h3 id="shortcuts-title">KEYBOARD SHORTCUTS &amp; ERGONOMICS</h3>
+          <button type="button" class="copilot-btn-close" id="btn-close-shortcuts">✕</button>
+        </div>
+        <div class="shortcuts-grid">
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>K</kbd> / <kbd>/</kbd></span> <span>Open Command Palette</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>1</kbd></span> <span>Switch to 🎯 8-Step Workflow View</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>2</kbd></span> <span>Switch to 📊 Portfolio Hub View</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>3</kbd></span> <span>Switch to 🔬 Quant Lab &amp; Charts View</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>4</kbd></span> <span>Switch to 🌐 All Panels View</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>C</kbd></span> <span>Toggle AI Quant Copilot</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>R</kbd></span> <span>Refresh Active Broker Portfolio</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>M</kbd></span> <span>Toggle Demo / Real Capital Mode</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>?</kbd></span> <span>Open Shortcuts Cheat Sheet</span></div>
+          <div class="shortcut-row"><span class="shortcut-keys"><kbd>Esc</kbd></span> <span>Close Any Modal / Dialog</span></div>
+        </div>
       </div>
     </div>
 
