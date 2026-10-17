@@ -161,5 +161,18 @@ trader-core/
     * **Local Ollama Concurrency**: Local LLM inference must be serialized (concurrency lock / semaphore = 1) with 45–90s timeouts to prevent GPU VRAM exhaustion or queue lockup.
     * **Exponential Backoff with Jitter**: All retry loops on transient HTTP 429/502/503 errors must use exponential backoff with randomized jitter: $t_{\text{wait}} = \min(t_{\max}, 2^{\text{attempt}} + \text{uniform}(0, 1))$.
 
+11. **Dual-Host Topology & Remote Execution Invariants (`lgram` vs `trader`)**:
+    * **Host Roles & Environment Separation**:
+      - **Developer Laptop (`lgram`)**: Arch Linux laptop where Antigravity runs. Repository workspace is at `/home/vineet/mnt/trader-core` (mounted over SSH). Code authoring, pytest verification, and local development occur here.
+      - **Runtime LXC Container (`trader`)**: Production Linux container on the LAN. Repository is at `~/trader-core` (`/home/vineet/trader-core`). Runs systemd Podman Quadlet services (`trader-dashboard`, `trader-engine`), has direct LAN connectivity to Ollama (`10.10.10.15:11434`) and Open-WebUI (`192.168.2.15:8080`), and manages persistent storage at `/var/lib/trader-core/data`.
+    * **Path Mapping Invariant**:
+      - When proposing terminal commands for the user to run on the server `[vineet@trader ~]$`, ALWAYS use remote container paths (`cd ~/trader-core`), NEVER laptop mount paths (`~/mnt/trader-core` or `/mnt/trader`).
+    * **Git Push/Pull Synchronization Invariant**:
+      - Code, deployment scripts, or Quadlets authored on `lgram` exist only on `lgram` until committed and pushed.
+      - Before instructing the user to execute new scripts or services on `trader`, the agent MUST ensure changes are committed and pushed to `origin/main` on GitHub, and instruct the user to run `git pull` on `trader` first.
+    * **Service Execution Target**:
+      - Rootful or rootless Podman commands, `systemctl` service starts, and Quadlet activations belong strictly on `trader`.
+
+
 
 
