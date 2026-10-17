@@ -20,7 +20,7 @@ class AIProviderClient:
         external_api_key: Optional[str] = None,
         external_model: Optional[str] = None,
         fallback_to_local: bool = True,
-        timeout: int = 40,
+        timeout: Optional[int] = None,
     ):
         p_raw = (provider or "ollama").lower()
         if p_raw in ("grok", "xai"):
@@ -37,7 +37,8 @@ class AIProviderClient:
         self.ollama_host = (ollama_host or os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")).rstrip("/")
         self.ollama_model = ollama_model or os.getenv("OLLAMA_MODEL", "deepseek-r1:7b")
         self.fallback_to_local = fallback_to_local
-        self.timeout = timeout
+        default_timeout = int(os.getenv("OLLAMA_TIMEOUT", "120"))
+        self.timeout = timeout if timeout is not None else default_timeout
 
 
     def generate(self, prompt: str, system_prompt: Optional[str] = None, format_json: bool = False) -> Dict[str, Any]:
@@ -81,6 +82,17 @@ class AIProviderClient:
                 "model": self.ollama_model,
                 "latency_ms": latency,
                 "fallback": self.provider == "external"
+            }
+        except requests.exceptions.Timeout as e:
+            latency = round((time.time() - start_time) * 1000, 1)
+            err_msg = f"[AI-TIMEOUT] Local Ollama timed out (>{self.timeout}s) at {self.ollama_host}. Proxmox vmbr1 bridge or GPU inference queue may be busy."
+            return {
+                "text": err_msg,
+                "provider_used": "ollama",
+                "model": self.ollama_model,
+                "latency_ms": latency,
+                "fallback": False,
+                "error": err_msg
             }
         except Exception as e:
             latency = round((time.time() - start_time) * 1000, 1)

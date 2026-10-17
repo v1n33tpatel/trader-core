@@ -501,14 +501,17 @@ Return STRICT RAW JSON ONLY in this format:
                 "format": "json",
                 "options": {"temperature": 0.2}
             }
+            timeout_val = int(os.getenv("OLLAMA_TIMEOUT", "120"))
             try:
-                r = requests.post(url, headers=headers, json=payload, timeout=90)
+                r = requests.post(url, headers=headers, json=payload, timeout=timeout_val)
                 if r.status_code == 200:
                     content = r.json().get("response", "")
                     latency = round((time.perf_counter() - t0) * 1000, 1)
                     return {"text": content, "latency_ms": latency}
                 else:
                     return {"text": f'{{"error": "Ollama host returned HTTP {r.status_code}: {r.text}"}}', "latency_ms": 0.0}
+            except requests.exceptions.Timeout:
+                return {"text": f'{{"error": "Ollama host timed out (>{timeout_val}s) at {ollama_host}. Check Proxmox vmbr1 network route or GPU load."}}', "latency_ms": 0.0}
             except Exception as e:
                 return {"text": f'{{"error": "{str(e)}"}}', "latency_ms": 0.0}
 

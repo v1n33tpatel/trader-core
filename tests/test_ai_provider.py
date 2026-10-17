@@ -87,3 +87,19 @@ def test_ai_connection_tester(monkeypatch):
     assert res["status"] == "online"
     assert res["latency_ms"] >= 0
     assert "deepseek-r1:7b" in res["models"]
+
+
+def test_ai_provider_timeout_diagnostics(monkeypatch):
+    import requests
+    def mock_timeout(*args, **kwargs):
+        raise requests.exceptions.ReadTimeout("Read timed out")
+
+    monkeypatch.setattr("requests.post", mock_timeout)
+    client = AIProviderClient(provider="ollama", timeout=120)
+    assert client.timeout == 120
+
+    res = client.generate("Evaluate ETH timeout")
+    assert "[AI-TIMEOUT]" in res["text"]
+    assert "vmbr1" in res["text"]
+    assert "120s" in res["text"]
+    assert res["error"] is not None

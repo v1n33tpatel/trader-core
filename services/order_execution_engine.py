@@ -58,13 +58,22 @@ class OrderExecutionEngineService:
 
             print(f"[OrderExecutionEngine] Intercepted Signal {signal_id}: {action} {symbol} @ {price}")
 
-            # 1. RiskSentinel Guardrail Enforcement
-            max_order_usd = float(self.state_store.get_setting("max_order_usd", "50.0"))
-            stop_loss_cap = float(self.state_store.get_setting("stop_loss_pct", "2.0"))
+            # 1. RiskSentinel Guardrail Enforcement & Dynamic Sizing
+            equity = float(self.state_store.get_setting("portfolio_equity", "1000.0"))
+            if stop_loss is not None:
+                sizing = self.risk_sentinel.calculate_dynamic_sizing(
+                    equity=equity,
+                    entry_price=price,
+                    stop_loss=float(stop_loss),
+                    take_profit=float(take_profit) if take_profit is not None else None,
+                    risk_pct=0.02,
+                )
+                units = sizing["recommended_units"]
+            else:
+                max_order_usd = float(self.state_store.get_setting("max_order_usd", "50.0"))
+                notional_usd = min(50.0, max_order_usd)
+                units = round(notional_usd / price, 6 if price < 1 else 4)
 
-            # Calculate safe order sizing capped at RiskSentinel limit
-            notional_usd = min(50.0, max_order_usd)
-            units = round(notional_usd / price, 6 if price < 1 else 4)
             if "EUR" in symbol or "GBP" in symbol or "JPY" in symbol:
                 units = 1000.0  # Standard micro-lot
 
@@ -116,12 +125,12 @@ class OrderExecutionEngineService:
 
     def _resolve_broker(self, symbol: str) -> str:
         s = symbol.upper()
-        if any(c in s for c in ("EUR", "GBP", "JPY", "AUD", "XAUUSD", "USOIL")):
+        if any(c in s for c in ("EUR", "GBP", "JPY", "AUD", "USDCHF", "USDCAD", "XAUUSD", "USOIL")):
             return "ctrader"
-        if "USDT" in s:
-            return "binance"
-        if any(c in s for c in ("AAPL", "MSFT", "NVDA", "SPY", "QQQ")):
+        if s.endswith(".L") or s.endswith("_L_EQ") or any(c in s for c in ("AAPL", "MSFT", "NVDA", "SPY", "QQQ", "VOO", "VTI", "EQQQ", "VUKE", "VUSA")):
             return "t212"
+        if "USDT" in s or "BTC" in s or "ETH" in s or "SOL" in s:
+            return "binance"
         return "binance"
 
     def run_loop(self):

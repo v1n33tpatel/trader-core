@@ -200,7 +200,7 @@ class TwoTierQuantAgent:
                 "messages": messages,
                 "tools": tools_schema,
                 "stream": False
-            }, timeout=30)
+            }, timeout=60)
             res = r.json()
             tool_calls = res.get("message", {}).get("tool_calls", [])
 
@@ -266,17 +266,20 @@ RULES:
   "suggested_tp": <float>
 }}
 """
+        timeout_val = int(os.getenv("OLLAMA_TIMEOUT", "120"))
         try:
             r = requests.post(self.generate_url, json={
                 "model": self.reasoner_model,
                 "prompt": prompt,
                 "stream": False,
                 "format": "json"
-            }, timeout=90)
+            }, timeout=timeout_val)
             res_text = r.json().get("response", "{}")
             # Strip internal <think>...</think> tags emitted by DeepSeek-R1
             clean_json_str = re.sub(r"<think>.*?</think>", "", res_text, flags=re.DOTALL).strip()
             return json.loads(clean_json_str)
+        except requests.exceptions.Timeout:
+            return {"action": "HOLD", "reason": f"Reasoner timed out (>{timeout_val}s) connecting to {self.generate_url}. Check Proxmox vmbr1 bridge or GPU queue.", "confidence": 0.0}
         except Exception as e:
             return {"action": "HOLD", "reason": f"Reasoner error: {str(e)}", "confidence": 0.0}
 

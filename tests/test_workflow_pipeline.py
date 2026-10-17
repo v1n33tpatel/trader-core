@@ -96,6 +96,42 @@ def test_workflow_recommend_equity(workflow_client):
     assert data["step_6_parameters"]["recommended_size_usd"] <= 50.0
 
 
+def test_workflow_recommend_lse_etf(workflow_client):
+    res = workflow_client.post(
+        "/api/workflow/recommend",
+        json={"symbol": "EQQQ_l_EQ", "broker": "t212", "current_price": 435.0}
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["symbol"] == "EQQQ.L"
+    assert data["asset_class"] == "ETF"
+    assert data["execution_pipeline"] == "MACRO_DCA"
+    assert data["broker"] == "t212"
+    assert data["step_5_strategy"]["strategy_id"] == "sma_macro_regime"
+    assert "200-Day SMA" in data["step_3_suggest"]["setup_name"]
+    assert "sma_200" in data["step_4_analyze"]
+    assert data["step_6_parameters"]["risk_reward_ratio"] >= 2.0
+    assert data["step_6_parameters"]["recommended_size_usd"] <= 50.0
+    assert "max_loss_base_currency" in data["step_6_parameters"]
+
+
+def test_workflow_recommend_crypto_50pct_ce(workflow_client):
+    res = workflow_client.post(
+        "/api/workflow/recommend",
+        json={"symbol": "BTCUSDT", "broker": "binance", "current_price": 67000.0}
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["asset_class"] == "CRYPTO"
+    assert data["execution_pipeline"] == "INTRADAY_STRUCTURAL"
+    assert data["step_5_strategy"]["strategy_id"] == "fvg_breakout"
+    assert "50% FVG CE" in data["step_3_suggest"]["setup_name"]
+    ce = data["step_4_analyze"]["consequent_encroachment"]
+    fvg_bottom, fvg_top = data["step_4_analyze"]["fvg_zone"]
+    assert fvg_bottom < ce < fvg_top
+    assert round(ce, 2) == round(fvg_bottom + 0.5 * (fvg_top - fvg_bottom), 2)
+
+
 def test_workflow_demo_execute(workflow_client, tmp_path):
     db_file = str(tmp_path / "test_workflow_state.db")
     res = workflow_client.post(

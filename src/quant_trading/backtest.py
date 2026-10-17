@@ -71,3 +71,80 @@ class BacktestEngine:
             equity=equity,
             metrics=metrics,
         )
+
+
+@dataclass(frozen=True)
+class WalkForwardResult:
+    train_result: BacktestResult
+    validation_result: BacktestResult
+    full_result: BacktestResult
+    split_index: int
+    train_end: str
+    validation_start: str
+    overfitting_ratio: float
+
+
+def run_walk_forward(
+    close: pd.Series,
+    strategy: Strategy,
+    config: BacktestConfig | None = None,
+    train_ratio: float = 0.70,
+) -> WalkForwardResult:
+    """
+    Executes Walk-Forward Analysis (e.g., 70% in-sample train, 30% out-of-sample forward test)
+    to evaluate strategy performance without overfitting.
+    """
+    prices = validate_close_prices(close)
+    n = len(prices)
+    if n < 20:
+        raise ValueError("At least 20 observations are required for walk-forward analysis")
+
+    split = int(n * train_ratio)
+    if split < 10 or (n - split) < 5:
+        raise ValueError("Insufficient observations for train and validation split")
+
+    cfg = config or BacktestConfig()
+    engine = BacktestEngine(cfg)
+    full_result = engine.run(prices, strategy)
+
+    # Train (in-sample)
+    train_returns = full_result.net_returns.iloc[:split]
+    train_metrics = calculate_metrics(train_returns, cfg.periods_per_year)
+    train_equity = (1.0 + train_returns).cumprod()
+    train_result = BacktestResult(
+        target_positions=full_result.target_positions.iloc[:split],
+        positions=full_result.positions.iloc[:split],
+        gross_returns=full_result.gross_returns.iloc[:split],
+        costs=full_result.costs.iloc[:split],
+        net_returns=train_returns,
+        equity=train_equity,
+        metrics=train_metrics,
+    )
+
+    # Validation (out-of-sample)
+    val_returns = full_result.net_returns.iloc[split:]
+    val_metrics = calculate_metrics(val_returns, cfg.periods_per_year)
+    val_equity = (1.0 + val_returns).cumprod()
+    val_result = BacktestResult(
+        target_positions=full_result.target_positions.iloc[split:],
+        positions=full_result.positions.iloc[split:],
+        gross_returns=full_result.gross_returns.iloc[split:],
+        costs=full_result.costs.iloc[split:],
+        net_returns=val_returns,
+        equity=val_equity,
+        metrics=val_metrics,
+    )
+
+    train_sharpe = train_metrics.sharpe_ratio if (train_metrics.sharpe_ratio is not None and np.isfinite(train_metrics.sharpe_ratio)) else 0.0
+    val_sharpe = val_metrics.sharpe_ratio if (val_metrics.sharpe_ratio is not None and np.isfinite(val_metrics.sharpe_ratio)) else 0.0
+    overfitting_ratio = round(val_sharpe / max(0.01, train_sharpe), 2) if train_sharpe > 0 else 0.0
+
+    return WalkForwardResult(
+        train_result=train_result,
+        validation_result=val_result,
+        full_result=full_result,
+        split_index=split,
+        train_end=str(prices.index[split - 1]),
+        validation_start=str(prices.index[split]),
+        overfitting_ratio=overfitting_ratio,
+    )

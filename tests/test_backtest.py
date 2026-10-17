@@ -87,3 +87,20 @@ def test_engine_rejects_misaligned_strategy_output() -> None:
 
     with pytest.raises(ValueError, match="same index"):
         BacktestEngine().run(close, MisalignedStrategy())
+
+
+def test_run_walk_forward_analysis() -> None:
+    from quant_trading import run_walk_forward, WalkForwardResult
+    dates = pd.date_range("2024-01-01", periods=100, freq="D")
+    # Linear upward trend
+    close = pd.Series(np.linspace(100.0, 150.0, 100), index=dates)
+    strat = TimeSeriesMomentum(lookback=5, volatility_window=5, max_leverage=1.0)
+
+    wf_res = run_walk_forward(close, strat, train_ratio=0.70)
+    assert isinstance(wf_res, WalkForwardResult)
+    assert wf_res.split_index == 70
+    assert len(wf_res.train_result.net_returns) == 70
+    assert len(wf_res.validation_result.net_returns) == 30
+    assert wf_res.train_result.metrics.sharpe_ratio is not None
+    assert wf_res.validation_result.metrics.sharpe_ratio is not None
+    assert wf_res.overfitting_ratio >= 0.0

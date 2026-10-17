@@ -2241,11 +2241,11 @@ function initOrchestratorAdmin() {
 
 const wfWatchlistsByBroker = {
   binance: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"],
-  t212: ["AAPL", "NVDA", "MSFT", "TSLA", "SPY", "QQQ", "VOO"],
+  t212: ["EQQQ.L", "VUKE.L", "VUSA.L", "SPY", "QQQ", "VOO", "AAPL", "NVDA", "MSFT", "TSLA"],
   etoro: ["ETH", "BTC", "SOL", "NVDA", "SPX500", "NAS100"],
   kraken: ["BTCUSD", "ETHUSD", "SOLUSD", "DOTUSD", "ADAUSD"],
   ctrader: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "XAUUSD", "USOIL"],
-  quantai: ["BTCUSDT", "SPY", "EURUSD", "ETHUSDT", "NVDA"],
+  quantai: ["BTCUSDT", "EQQQ.L", "SPY", "EURUSD", "ETHUSDT", "NVDA"],
 };
 
 let wfCurrentStep = 1;
@@ -2265,7 +2265,7 @@ function renderWorkflowChips(broker, assetFilter = "ALL") {
       assetClass = "FOREX";
     } else if (sym === "XAUUSD" || sym === "USOIL") {
       assetClass = "COMMODITY";
-    } else if (sym === "SPY" || sym === "QQQ" || sym === "VOO") {
+    } else if (sym.endsWith(".L") || ["SPY", "QQQ", "VOO", "VTI", "IWM", "GLD", "EQQQ.L", "VUKE.L", "VUSA.L"].includes(sym)) {
       assetClass = "ETFS";
     } else if (["AAPL", "NVDA", "MSFT", "TSLA"].includes(sym)) {
       assetClass = "STOCKS";
@@ -2323,6 +2323,13 @@ async function loadWorkflowRecommendation(symbol) {
     if (data.status !== "success") throw new Error(data.error || "Recommendation failed");
     wfCurrentData = data;
 
+    // Step 1 Badge update
+    const pipeBadge = document.querySelector("#wf-pipeline-badge");
+    if (pipeBadge) {
+      const isMacro = data.execution_pipeline === "MACRO_DCA";
+      pipeBadge.innerHTML = `<span class="badge ${isMacro ? "badge-strat" : ""}">${isMacro ? "PIPELINE: MACRO DCA (ETF)" : "PIPELINE: INTRADAY STRUCTURAL"}</span>`;
+    }
+
     // Step 2: Research
     const scoreEl = document.querySelector("#wf-sentiment-score");
     const badgeEl = document.querySelector("#wf-sentiment-badge");
@@ -2352,12 +2359,14 @@ async function loadWorkflowRecommendation(symbol) {
     const setupName = document.querySelector("#wf-setup-name");
     const setupBias = document.querySelector("#wf-setup-bias");
     const setupConf = document.querySelector("#wf-setup-confidence");
+    const engineNote = document.querySelector("#wf-engine-note");
     if (setupName) setupName.textContent = data.step_3_suggest.setup_name;
     if (setupBias) {
       setupBias.textContent = `BIAS: ${data.step_3_suggest.action}`;
-      setupBias.style.color = data.step_3_suggest.action === "BUY" ? "#10b981" : "#ef4444";
+      setupBias.style.color = data.step_3_suggest.action === "BUY" ? "#10b981" : (data.step_3_suggest.action === "HOLD" ? "#eab308" : "#ef4444");
     }
     if (setupConf) setupConf.textContent = `CONFIDENCE: ${(data.step_3_suggest.confidence * 100).toFixed(0)}%`;
+    if (engineNote) engineNote.textContent = data.step_3_suggest.engine_note || "";
 
     // Step 4: Analyze
     const pHigh = document.querySelector("#wf-pivot-high");
@@ -2365,17 +2374,25 @@ async function loadWorkflowRecommendation(symbol) {
     const poc = document.querySelector("#wf-poc");
     const va = document.querySelector("#wf-va");
     const fvg = document.querySelector("#wf-fvg");
+    const ce = document.querySelector("#wf-ce");
     if (pHigh) pHigh.textContent = `$${data.step_4_analyze.pivot_high.toFixed(2)}`;
     if (pLow) pLow.textContent = `$${data.step_4_analyze.pivot_low.toFixed(2)}`;
     if (poc) poc.textContent = `$${data.step_4_analyze.point_of_control.toFixed(2)}`;
     if (va) va.textContent = `$${data.step_4_analyze.value_area_low.toFixed(2)} - $${data.step_4_analyze.value_area_high.toFixed(2)}`;
     if (fvg) fvg.textContent = `Retest $${data.step_4_analyze.fvg_zone[0].toFixed(2)} - $${data.step_4_analyze.fvg_zone[1].toFixed(2)}`;
+    if (ce) {
+      if (data.asset_class === "ETF") {
+        ce.textContent = `200 SMA $${data.step_4_analyze.sma_200.toFixed(2)}`;
+      } else {
+        ce.textContent = `50% CE $${data.step_4_analyze.consequent_encroachment.toFixed(2)}`;
+      }
+    }
 
     // Step 5: Strategy
     const stratTitle = document.querySelector("#wf-strat-title");
-    if (stratTitle) stratTitle.textContent = `${data.step_5_strategy.strategy_name} (${data.step_5_strategy.category.toUpperCase()})`;
+    if (stratTitle) stratTitle.textContent = `${data.step_5_strategy.strategy_name} (${data.step_5_strategy.pipeline_type || data.step_5_strategy.category.toUpperCase()})`;
 
-    // Step 6: Parameters
+    // Step 6: Parameters & Pre-Trade Audit
     const pEntry = document.querySelector("#wf-param-entry");
     const pStop = document.querySelector("#wf-param-stop");
     const pRiskPct = document.querySelector("#wf-param-risk-pct");
@@ -2383,14 +2400,30 @@ async function loadWorkflowRecommendation(symbol) {
     const pRr = document.querySelector("#wf-param-rr");
     const pSize = document.querySelector("#wf-param-size");
     const pUnits = document.querySelector("#wf-param-units");
+    const pMaxLoss = document.querySelector("#wf-param-max-loss");
+    const pEquityBudget = document.querySelector("#wf-param-equity-budget");
+    const auditStatus = document.querySelector("#wf-audit-status");
+    const brokerBadge = document.querySelector("#wf-target-broker-badge");
+    const auditDetail = document.querySelector("#wf-audit-detail");
 
-    if (pEntry) pEntry.textContent = `$${data.step_6_parameters.entry_price.toFixed(data.step_6_parameters.entry_price < 10 ? 4 : 2)}`;
-    if (pStop) pStop.textContent = `$${data.step_6_parameters.stop_loss.toFixed(data.step_6_parameters.stop_loss < 10 ? 4 : 2)}`;
-    if (pRiskPct) pRiskPct.textContent = `-${data.step_6_parameters.risk_pct}% Risk (Under Rejection Wick)`;
-    if (pTp) pTp.textContent = `$${data.step_6_parameters.take_profit.toFixed(data.step_6_parameters.take_profit < 10 ? 4 : 2)}`;
-    if (pRr) pRr.textContent = `Target R:R 1:${data.step_6_parameters.risk_reward_ratio} (≥ 1:2.0 Mandatory)`;
-    if (pSize) pSize.textContent = `$${data.step_6_parameters.recommended_size_usd.toFixed(2)}`;
-    if (pUnits) pUnits.textContent = `Units: ${data.step_6_parameters.recommended_units} · RiskSentinel Cap`;
+    const p = data.step_6_parameters;
+    if (pEntry) pEntry.textContent = `$${p.entry_price.toFixed(p.entry_price < 10 ? 4 : 2)}`;
+    if (pStop) pStop.textContent = `$${p.stop_loss.toFixed(p.stop_loss < 10 ? 4 : 2)}`;
+    if (pRiskPct) pRiskPct.textContent = `-${p.risk_pct}% Risk (Under Invalidation Wick)`;
+    if (pTp) pTp.textContent = `$${p.take_profit.toFixed(p.take_profit < 10 ? 4 : 2)}`;
+    if (pRr) pRr.textContent = `Target R:R 1:${p.risk_reward_ratio} (≥ 1:2.0 Mandatory)`;
+    if (pSize) pSize.textContent = `$${p.recommended_size_usd.toFixed(2)}`;
+    if (pUnits) pUnits.textContent = `Units: ${p.recommended_units} · RiskSentinel Cap`;
+    if (pMaxLoss) pMaxLoss.textContent = `-$${p.max_loss_base_currency.toFixed(2)}`;
+    if (pEquityBudget) pEquityBudget.textContent = `Equity: $${p.equity.toFixed(2)} (2% = $${(p.equity * 0.02).toFixed(2)})`;
+    if (auditStatus) {
+      auditStatus.textContent = p.pre_trade_audit?.valid ? "PASSED" : "REJECTED";
+      auditStatus.className = p.pre_trade_audit?.valid ? "color-green" : "color-red";
+    }
+    if (brokerBadge) brokerBadge.textContent = `DESTINATION: ${p.target_broker.toUpperCase()}`;
+    if (auditDetail) {
+      auditDetail.textContent = `Capital preservation rule satisfied · Max loss bounded to $${p.max_loss_base_currency.toFixed(2)} (≤ 2.0% equity) · Order notional $${p.recommended_size_usd.toFixed(2)} (≤ $50.00 RiskSentinel limit) · Mandatory R:R 1:${p.risk_reward_ratio} verified.`;
+    }
 
   } catch (err) {
     if (headline) headline.textContent = `Error loading workflow intel: ${err.message}`;

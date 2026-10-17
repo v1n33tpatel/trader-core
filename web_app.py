@@ -668,9 +668,12 @@ def agent_query():
         "quantai": "You are QuantAI for MoneyMakingMachine - QWERTY CORP. Provide a concise cross-broker executive summary for Equities (T212) and Crypto (Binance/Kraken/eToro).",
         "price_action": f"You are the Institutional Price Action & Market Structure Agent. Evaluate {symbol} using swing pivot levels, liquidity sweeps, pinbar rejections, and break of structure (BOS). Identify key invalidation levels and 1:2 Risk/Reward targets. Give action: BUY, SELL, or HOLD."
     }
+    timeout_val = int(os.getenv("OLLAMA_TIMEOUT", "120"))
     try:
-        r = requests.post(f"{OLLAMA_URL}/api/generate", json={"model": "deepseek-r1:7b", "prompt": prompts.get(broker, prompts["t212"]), "stream": False}, timeout=35)
+        r = requests.post(f"{OLLAMA_URL}/api/generate", json={"model": "deepseek-r1:7b", "prompt": prompts.get(broker, prompts["t212"]), "stream": False}, timeout=timeout_val)
         return jsonify({"analysis": r.json().get("response", "")}) if r.status_code == 200 else jsonify({"error": f"Ollama HTTP {r.status_code}"}), 500
+    except requests.exceptions.Timeout:
+        return jsonify({"error": f"Ollama connection timed out (>{timeout_val}s) at {OLLAMA_URL}. Check Proxmox vmbr1 bridge or GPU queue."}), 504
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 

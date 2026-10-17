@@ -1,4 +1,10 @@
-from quant_trading.backtest import BacktestConfig, BacktestEngine, BacktestResult
+from quant_trading.backtest import (
+    BacktestConfig,
+    BacktestEngine,
+    BacktestResult,
+    WalkForwardResult,
+    run_walk_forward,
+)
 from quant_trading.metrics import (
     PerformanceMetrics,
     calculate_metrics,
@@ -16,6 +22,8 @@ __all__ = [
     "BacktestConfig",
     "BacktestEngine",
     "BacktestResult",
+    "WalkForwardResult",
+    "run_walk_forward",
     "PerformanceMetrics",
     "Strategy",
     "TimeSeriesMomentum",

@@ -1,5 +1,40 @@
 import os, base64, requests
 
+def normalize_t212_ticker(raw_ticker: str) -> str:
+    """
+    Normalizes Trading 212 raw tickers into standard display & market data tickers.
+    Preserves .L for London Stock Exchange tickers to prevent data mismatches with US equivalents
+    (e.g., EQQQ_l_EQ -> EQQQ.L vs US QQQ; VUKE_l_EQ -> VUKE.L).
+    """
+    if not raw_ticker:
+        return ""
+    r = raw_ticker.strip()
+    if r.endswith("_l_EQ") or r.endswith("l_EQ") or r.endswith(".L"):
+        base = r.replace("_l_EQ", "").replace("l_EQ", "").replace(".L", "")
+        return f"{base}.L"
+    if r.endswith("_US_EQ"):
+        return r.replace("_US_EQ", "")
+    if r.endswith("_EQ"):
+        return r.replace("_EQ", "")
+    return r
+
+
+def to_t212_order_ticker(clean_symbol: str) -> str:
+    """
+    Maps a clean ticker back to Trading 212 API order symbol.
+    EQQQ.L -> EQQQ_l_EQ, AAPL -> AAPL_US_EQ, QQQ -> QQQ_US_EQ.
+    """
+    if not clean_symbol:
+        return ""
+    s = clean_symbol.strip()
+    if s.endswith("_EQ"):
+        return s
+    if s.endswith(".L"):
+        base = s.replace(".L", "")
+        return f"{base}_l_EQ"
+    return f"{s}_US_EQ"
+
+
 class Trading212Broker:
     def __init__(self, is_demo: bool = True):
         self.is_demo = is_demo
@@ -58,7 +93,7 @@ class Trading212Broker:
             positions = []
             for p in raw_positions:
                 raw_tkr = p.get("ticker", "UNKNOWN")
-                clean_sym = raw_tkr.replace("_US_EQ", "").replace("_EQ", "").replace("l_EQ", "").replace(".L", "")
+                clean_sym = normalize_t212_ticker(raw_tkr)
                 
                 qty = float(p.get("quantity", 0.0))
                 avg_price = float(p.get("averagePrice", 0.0))

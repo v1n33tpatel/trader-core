@@ -279,11 +279,12 @@ def analyze_market_route():
         target_ollama = target_ollama.rstrip("/")
 
         preferred_model = model_name
+        req_timeout = int(os.getenv("OLLAMA_TIMEOUT", "120"))
         try:
             response = requests.post(
                 f"{target_ollama}/api/generate",
                 json={"model": preferred_model, "prompt": prompt, "stream": False},
-                timeout=45,
+                timeout=req_timeout,
             )
             if getattr(response, "status_code", 200) == 404:
                 # Model not found on Ollama, try finding an available model from tags per Rule 12
@@ -298,7 +299,7 @@ def analyze_market_route():
                             response = requests.post(
                                 f"{target_ollama}/api/generate",
                                 json={"model": preferred_model, "prompt": prompt, "stream": False},
-                                timeout=45,
+                                timeout=req_timeout,
                             )
                 except Exception:
                     pass
@@ -312,6 +313,8 @@ def analyze_market_route():
                 analysis = raw_analysis.strip()
             if not analysis:
                 return jsonify({"error": "The analysis model returned an empty response"}), 502
+        except requests.exceptions.Timeout:
+            return jsonify({"error": f"Ollama connection timed out (>{req_timeout}s) at {target_ollama}. Check Proxmox vmbr1 bridge or GPU queue."}), 504
         except requests.RequestException as e:
             err_msg = str(e)
             if hasattr(e, "response") and e.response is not None:
