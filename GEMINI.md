@@ -146,10 +146,17 @@ trader-core/
    * **Mock-First Testing**: Pytest tests must never issue live HTTP calls to Trading 212; always mock via `monkeypatch`.
 
 8. **cTrader Open API & Broker Guidelines**:
-   * **Endpoints & Ports**: Live host is `live.ctraderapi.com`; Demo host is `demo.ctraderapi.com`. Port `5035` is Protocol Buffers (TCP/WSS); Port `5036` is JSON.
-   * **Two-Tier Authentication**: First exchange OAuth 2.0 authorization code for `accessToken` via `https://connect.spotware.com/apps/token`. Over the socket, send `ProtoOAApplicationAuthReq` (with `clientId`/`clientSecret`), then `ProtoOAAccountAuthReq` (with `ctidTraderAccountId`/`accessToken`).
+   * **Dual Integration Pathways (Remote MCP vs. Open API Socket)**:
+     - **AI Agent Connect / Remote MCP**: Streamable HTTP endpoint at `https://mcp.ctrader.com/trading/mcp`. Authenticates via per-account Bearer token generated in cTrader Web (`Settings -> Remote MCP`).
+     - **Classic Open API (Sockets)**: Live host is `live.ctraderapi.com`; Demo host is `demo.ctraderapi.com`. Port `5035` (Protobuf TCP/WSS); Port `5036` (JSON). Uses OAuth 2.0 via `https://connect.spotware.com/apps/token`.
+   * **Remote MCP Per-Account Token Invariant**:
+     - Remote MCP calls require a valid account-specific bearer token slug. Generic environment tokens (`{"plant":"ctrader","environment":"demo"}`) are rejected with `Invalid Authorization Bearer slug`.
+     - Traders must select an active Demo/Live account in cTrader Web to generate the account slug.
+     - Remote MCP authentication requires an active cTrader Web session under the user's cTID.
+   * **Graceful Degradation & Demo Fallback**:
+     - If cTrader MCP or Open API credentials are not provided or expired, adapters must fail safely, returning `(0.0, [])` or operating in local simulated demo mode without raising unhandled 500 exceptions.
    * **Web Security**: Client secrets and OAuth token exchanges must remain strictly on the backend. Never expose cTrader application secrets to frontend JavaScript.
-   * **Mock-First Testing**: Pytest tests must never open live sockets to cTrader; always mock transport layers and message handlers.
+   * **Mock-First Testing**: Pytest tests must never open live sockets or make live HTTP requests to cTrader; always mock transport layers and message handlers.
 
 9. **Market Imbalances, CME Gaps & Liquidity Clusters**:
    * **CME Gaps as Magnets**: Weekend gaps between Friday 17:00 ET close and Sunday 18:00 ET open act as macro mean-reversion targets and high-probability take-profit zones, not immediate breakout triggers.

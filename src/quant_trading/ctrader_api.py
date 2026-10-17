@@ -77,10 +77,12 @@ def ctrader_order():
 @ctrader_blueprint.get("/api/ctrader/status")
 def ctrader_status():
     broker = get_ctrader_broker()
+    is_mcp = broker.is_mcp_configured()
     return jsonify({
         "status": "online" if broker.is_configured() else "unconfigured",
         "demo": broker.is_demo,
-        "host": broker.host,
+        "mcp_enabled": is_mcp,
+        "host": broker.mcp_url if is_mcp else broker.host,
         "account_id": broker.account_id if broker.is_configured() else None,
     })
 

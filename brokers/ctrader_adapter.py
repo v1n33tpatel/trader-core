@@ -61,12 +61,67 @@ class CTraderBroker(BaseBroker):
         self.account_id = _load_env_key("CTRADER_ACCOUNT_ID")
         self.access_token = _load_env_key("CTRADER_ACCESS_TOKEN")
 
+        # cTrader AI Agent Connect (Remote MCP) parameters
+        self.mcp_url = _load_env_key("CTRADER_MCP_URL") or "https://mcp.ctrader.com/trading/mcp"
+        self.mcp_token = _load_env_key("CTRADER_MCP_TOKEN")
+
         # In-memory practice positions for demo testing
         self._demo_positions: List[Dict[str, Any]] = []
 
     def is_configured(self) -> bool:
-        """Checks if live API credentials are fully provided."""
-        return bool(self.client_id and self.client_secret and self.account_id and self.access_token)
+        """Checks if either Remote MCP token or classic Open API credentials are provided."""
+        return self.is_mcp_configured() or bool(self.client_id and self.client_secret and self.account_id and self.access_token)
+
+    def is_mcp_configured(self) -> bool:
+        """Checks if a valid, non-placeholder cTrader Remote MCP Bearer token is configured."""
+        if not self.mcp_token:
+            return False
+        # Catch unauthenticated environment template slug
+        if "eyJwbGFudCI6" in self.mcp_token:
+            return False
+        return len(self.mcp_token.strip()) > 10
+
+    def call_mcp_tool(self, name: str, arguments: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        """
+        Calls a tool on the cTrader Remote MCP Server via JSON-RPC 2.0.
+        Returns the parsed tool result dictionary.
+        """
+        if not self.is_mcp_configured():
+            raise ValueError("cTrader Remote MCP token is not configured or is an unauthenticated template slug.")
+
+        headers = {
+            "Authorization": f"Bearer {self.mcp_token.strip()}",
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        payload = {
+            "jsonrpc": "2.0",
+            "id": int(time.time() * 1000),
+            "method": "tools/call",
+            "params": {
+                "name": name,
+                "arguments": arguments or {},
+            },
+        }
+        try:
+            res = requests.post(self.mcp_url, json=payload, headers=headers, timeout=8.0)
+            if res.status_code == 401:
+                return {"error": "Invalid or expired cTrader MCP Bearer token slug (HTTP 401)"}
+            res.raise_for_status()
+            data = res.json()
+            if "error" in data:
+                return {"error": data["error"]}
+            result = data.get("result", {})
+            if "content" in result and isinstance(result["content"], list):
+                for c in result["content"]:
+                    if c.get("type") == "text" and isinstance(c.get("text"), str):
+                        try:
+                            return json.loads(c["text"])
+                        except Exception:
+                            return {"text": c["text"]}
+            return result
+        except Exception as e:
+            return {"error": str(e)}
 
     @staticmethod
     def calculate_pips(symbol: str, entry_price: float, current_price: float, is_buy: bool = True) -> float:
@@ -135,9 +190,35 @@ class CTraderBroker(BaseBroker):
         """
         Retrieves cash and open positions.
         Returns (cash, positions_list).
-        If unconfigured and in practice mode, returns a simulated demo account.
-        If live request fails, fails gracefully returning (0.0, []).
+        Prioritizes Remote MCP if configured; falls back to demo simulation or fails gracefully returning (0.0, []).
         """
+        if self.is_mcp_configured():
+            try:
+                acc_info = self.call_mcp_tool("get_account_information")
+                if not acc_info.get("error"):
+                    balance = float(acc_info.get("balance", 0.0) or acc_info.get("freeMargin", 0.0))
+                    raw_positions = self.call_mcp_tool("get_positions")
+                    pos_list = []
+                    if isinstance(raw_positions, list):
+                        for p in raw_positions:
+                            pos_list.append({
+                                "position_id": str(p.get("positionId") or p.get("id", "")),
+                                "symbol": str(p.get("symbol", "")),
+                                "side": str(p.get("tradeSide") or p.get("side", "BUY")),
+                                "units": float(p.get("volume", 0.0)),
+                                "open_price": float(p.get("entryPrice") or p.get("price", 0.0)),
+                                "invested": float(p.get("usedMargin", 0.0)),
+                                "ppl": float(p.get("unrealizedPnl") or p.get("netProfit", 0.0)),
+                                "ppl_pct": 0.0,
+                                "stop_loss": p.get("stopLoss"),
+                                "take_profit": p.get("takeProfit"),
+                                "status": "ACTIVE",
+                                "broker": "ctrader",
+                            })
+                    return balance, pos_list
+            except Exception:
+                pass
+
         if not self.is_configured():
             if self.is_demo:
                 # Simulated practice forex portfolio
@@ -146,7 +227,6 @@ class CTraderBroker(BaseBroker):
 
         try:
             # Over real cTrader socket or gateway proxy
-            # Default fallback when sockets are not connected
             return 0.0, []
         except Exception:
             return 0.0, []
@@ -162,9 +242,35 @@ class CTraderBroker(BaseBroker):
         """
         Submits market order for forex or commodity instrument.
         amount represents quantity / notional volume (e.g. 1000 for micro-lot).
+        Routes via cTrader Remote MCP if configured; otherwise simulates or uses Open API.
         """
         side = "BUY" if is_buy else "SELL"
         symbol_norm = symbol.upper()
+
+        if self.is_mcp_configured() and not self.is_demo:
+            try:
+                args = {
+                    "symbol": symbol_norm,
+                    "volume": float(amount),
+                    "side": side,
+                }
+                if stop_loss is not None:
+                    args["stopLoss"] = float(stop_loss)
+                if take_profit is not None:
+                    args["takeProfit"] = float(take_profit)
+                mcp_res = self.call_mcp_tool("place_order", args)
+                if not mcp_res.get("error"):
+                    return {
+                        "status": "FILLED",
+                        "order_id": str(mcp_res.get("orderId") or mcp_res.get("positionId", f"CT-MCP-{int(time.time()*1000)}")),
+                        "symbol": symbol_norm,
+                        "side": side,
+                        "units": amount,
+                        "mcp": True,
+                        "demo": False,
+                    }
+            except Exception as e:
+                return {"status": "ERROR", "error": f"cTrader MCP Order Failed: {str(e)}"}
 
         if self.is_demo or not self.is_configured():
             # Practice order simulation
