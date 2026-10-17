@@ -25,6 +25,7 @@ from quant_trading.orchestrator_api import orchestrator_blueprint
 from quant_trading.ctrader_api import ctrader_blueprint
 from quant_trading.workflow_api import workflow_blueprint
 from quant_trading.pubsub_api import pubsub_blueprint
+from quant_trading.resource_api import resource_blueprint
 from core.state_store import StateStore
 from feeds.ai_provider import AIProviderClient
 
@@ -36,6 +37,7 @@ app.register_blueprint(orchestrator_blueprint)
 app.register_blueprint(ctrader_blueprint)
 app.register_blueprint(workflow_blueprint)
 app.register_blueprint(pubsub_blueprint)
+app.register_blueprint(resource_blueprint)
 OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")
 
 

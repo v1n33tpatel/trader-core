@@ -1,6 +1,7 @@
 import time, sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from datetime import datetime, timezone
 from models.events import BarEvent, SignalSide
 from feeds.binance_feed import BinanceFeed
 from risk.guardrail import RiskSentinel
@@ -15,9 +16,24 @@ def run_orchestrator():
 
     print("[ENGINE] Multi-asset orchestrator initialized with Reactive Price Action Engine. Event loop running...")
     history_cache = {s: [] for s in symbols}
+    last_nightly_date = None
 
     while True:
         try:
+            # Automated Nightly Resource Hub Sync (02:00 UTC)
+            now_utc = datetime.now(timezone.utc)
+            today_str = now_utc.strftime("%Y-%m-%d")
+            if now_utc.hour == 2 and last_nightly_date != today_str:
+                last_nightly_date = today_str
+                try:
+                    from quant_trading.resource_manager import ResourceManager
+                    print(f"[ENGINE-NIGHTLY] Triggering automated 02:00 UTC Resource Hub sync to Open-WebUI...")
+                    rm = ResourceManager()
+                    sync_res = rm.run_nightly_refresh()
+                    print(f"[ENGINE-NIGHTLY] Refresh complete in {sync_res.get('duration_ms')}ms. Items synced: {sync_res.get('sync_result', {}).get('items_synced', 0)}")
+                except Exception as sync_err:
+                    print(f"[ENGINE-NIGHTLY-ERROR] {sync_err}")
+
             for sym in symbols:
                 m = BinanceFeed.get_market_data(sym)
                 if not m:

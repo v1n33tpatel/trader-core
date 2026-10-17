@@ -7,6 +7,7 @@ const brokerNames = {
   quantai: "QuantAI",
   admin: "Admin & Control",
   intel: "Market Intel (Agent C)",
+  resources: "Resource Hub & RAG",
 };
 
 const selectedBroker = document.querySelector(".broker-tab.is-active");
@@ -357,6 +358,7 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
 
     const adminPanel = document.querySelector("#admin-panel");
     const intelPanel = document.querySelector("#intel-panel");
+    const resourcesPanel = document.querySelector("#panel-resources");
     const standardPanels = document.querySelectorAll(
       ".portfolio-panel, .backtest-panel, .sizing-panel, .search-panel, .agent-panel"
     );
@@ -364,6 +366,7 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
     if (currentBroker === "admin") {
       standardPanels.forEach((p) => (p.hidden = true));
       if (intelPanel) intelPanel.hidden = true;
+      if (resourcesPanel) resourcesPanel.hidden = true;
       if (adminPanel) {
         adminPanel.hidden = false;
         loadAdminData();
@@ -375,6 +378,7 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
     if (currentBroker === "intel") {
       standardPanels.forEach((p) => (p.hidden = true));
       if (adminPanel) adminPanel.hidden = true;
+      if (resourcesPanel) resourcesPanel.hidden = true;
       if (intelPanel) {
         intelPanel.hidden = false;
         loadMarketIntel(currentIntelSymbol);
@@ -382,8 +386,20 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
       return;
     }
 
+    if (currentBroker === "resources") {
+      standardPanels.forEach((p) => (p.hidden = true));
+      if (adminPanel) adminPanel.hidden = true;
+      if (intelPanel) intelPanel.hidden = true;
+      if (resourcesPanel) {
+        resourcesPanel.hidden = false;
+        loadResourcesHub();
+      }
+      return;
+    }
+
     if (adminPanel) adminPanel.hidden = true;
     if (intelPanel) intelPanel.hidden = true;
+    if (resourcesPanel) resourcesPanel.hidden = true;
     applyWorkspaceViewMode();
 
     const broker = brokerNames[currentBroker];
@@ -3238,6 +3254,8 @@ const COMMAND_REGISTRY = [
   { id: "broker_ctrader", title: "Select Broker: cTrader Open API Forex", category: "Brokers", keyword: "ctrader forex eurusd xauusd", action: () => selectBrokerTab("ctrader") },
   { id: "broker_quantai", title: "Select Broker: Quant AI Engine", category: "Brokers", keyword: "ai copilot orchestrator", action: () => selectBrokerTab("quantai") },
   { id: "broker_admin", title: "Admin Portal: RiskSentinel & Audit Ledger", category: "Brokers", keyword: "admin ledger bounds store", action: () => selectBrokerTab("admin") },
+  { id: "broker_resources", title: "Resource Hub: Knowledge Base & Open-WebUI RAG", category: "Brokers", shortcut: "5", keyword: "resource hub knowledge rag sec openwebui data equation", action: () => selectBrokerTab("resources") },
+  { id: "sync_resources", title: "⚡ Sync All Resources to Open-WebUI Vector Memory", category: "Tools", keyword: "sync rag openwebui vector", action: () => document.querySelector("#btn-sync-resources-now")?.click() },
 
   // Actions & Utilities
   { id: "toggle_copilot", title: "Toggle AI Quant Copilot Window", category: "Tools", shortcut: "C", action: () => document.querySelector("#btn-topbar-copilot")?.click() },
@@ -3474,6 +3492,9 @@ function initGlobalShortcuts() {
     } else if (e.key === "4") {
       applyWorkspaceViewMode("all");
       showToast("View mode: 🌐 Continuous Layout (All Panels)", "info", 1500);
+    } else if (e.key === "5") {
+      selectBrokerTab("resources");
+      showToast("Tab: 📚 Resource Hub & RAG", "info", 1500);
     } else if (e.key === "c" || e.key === "C") {
       document.querySelector("#btn-topbar-copilot")?.click();
     } else if (e.key === "r" || e.key === "R") {
@@ -3485,12 +3506,489 @@ function initGlobalShortcuts() {
   });
 }
 
+/* =========================================================================
+   8. RESOURCE HUB & OPEN-WEBUI KNOWLEDGE INGESTION CONTROLLER
+   ========================================================================= */
+
+let currentResourceCategory = "ALL";
+let allLoadedResources = [];
+let currentViewResourceId = null;
+
+async function loadResourcesHub() {
+  const grid = document.querySelector("#resources-grid");
+  const owuDot = document.querySelector("#res-owu-dot");
+  const owuText = document.querySelector("#res-owu-status-text");
+  const hudTotal = document.querySelector("#hud-total-resources");
+  const hudSynced = document.querySelector("#hud-synced-resources");
+  const hudLastTime = document.querySelector("#hud-last-sync-time");
+  const hudLastStatus = document.querySelector("#hud-last-sync-status");
+  const logsTbody = document.querySelector("#res-sync-logs-tbody");
+
+  // 1. Fetch Sync Status & Telemetry
+  try {
+    const statusRes = await fetch("/api/resources/sync/status");
+    if (statusRes.ok) {
+      const data = await statusRes.json();
+      const isOwuOnline = data.openwebui && data.openwebui.status === "online";
+      if (owuDot) owuDot.className = isOwuOnline ? "status-dot status-dot-online" : "status-dot status-dot-offline";
+      if (owuText) owuText.textContent = isOwuOnline ? `OWU: ONLINE (${data.openwebui.latency_ms}ms)` : `OWU: ${data.openwebui?.status?.toUpperCase() || "OFFLINE"}`;
+      if (hudTotal) hudTotal.textContent = String(data.total_resources || 0);
+      if (hudSynced) hudSynced.textContent = String(data.synced_resources || 0);
+      if (hudLastTime) {
+        if (data.last_synced_at && data.last_synced_at !== "Never") {
+          const d = new Date(data.last_synced_at);
+          hudLastTime.textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        } else {
+          hudLastTime.textContent = "Never";
+        }
+      }
+      if (hudLastStatus) {
+        hudLastStatus.textContent = `${data.synced_resources || 0}/${data.total_resources || 0} Synced to Vector KB`;
+      }
+
+      // Update Category Badge Counts
+      if (data.category_counts) {
+        const counts = data.category_counts;
+        const setCt = (id, count) => {
+          const el = document.querySelector(`#${id}`);
+          if (el) el.textContent = String(count || 0);
+        };
+        setCt("count-all", data.total_resources);
+        setCt("count-equation", counts.EQUATION);
+        setCt("count-historical_data", counts.HISTORICAL_DATA);
+        setCt("count-sec_data", counts.SEC_DATA);
+        setCt("count-company", counts.COMPANY);
+        setCt("count-calendar", counts.CALENDAR);
+        setCt("count-website", counts.WEBSITE);
+      }
+
+      // Populate Audit Logs
+      if (logsTbody && data.recent_sync_logs && data.recent_sync_logs.length > 0) {
+        logsTbody.innerHTML = data.recent_sync_logs.map(log => `
+          <tr>
+            <td style="font-family:var(--mono);">${log.id}</td>
+            <td><span class="badge ${log.trigger_type === 'NIGHTLY_CRON' ? 'badge-company' : 'badge-historical_data'}">${log.trigger_type}</span></td>
+            <td style="font-family:var(--mono);">${log.synced_at.replace("T", " ").slice(0, 19)}</td>
+            <td style="color:#34d399; font-weight:600;">${log.items_synced}</td>
+            <td style="color:${log.items_failed > 0 ? '#ef4444' : 'var(--muted)'};">${log.items_failed}</td>
+            <td><span class="res-sync-badge ${log.status === 'SUCCESS' ? 'is-synced' : 'is-pending'}">${log.status}</span></td>
+            <td style="font-family:var(--mono);">${log.duration_ms}ms</td>
+          </tr>
+        `).join("");
+      }
+    }
+  } catch (err) {
+    console.warn("Could not fetch resource sync status:", err);
+  }
+
+  // 2. Fetch Resources List
+  try {
+    const url = currentResourceCategory === "ALL" 
+      ? "/api/resources" 
+      : `/api/resources?category=${encodeURIComponent(currentResourceCategory)}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      allLoadedResources = data.resources || [];
+      renderResourcesGrid(allLoadedResources);
+    }
+  } catch (err) {
+    if (grid) grid.innerHTML = `<div class="empty-cell" style="padding:20px; color:#ef4444;">Failed to load resources: ${err.message}</div>`;
+  }
+}
+
+function renderResourcesGrid(resources) {
+  const grid = document.querySelector("#resources-grid");
+  if (!grid) return;
+
+  if (!resources || resources.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 36px 20px; text-align: center; background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius);">
+        <p style="font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px;">No resources found in this category.</p>
+        <p style="font-size: 12.5px; color: var(--muted); margin-bottom: 16px;">Click "+ Add Resource" above or click "↻ Seed Quant Library" to re-seed default formulas.</p>
+        <button type="button" class="button button-primary" onclick="document.querySelector('#btn-open-add-resource')?.click()">+ Add First Resource</button>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = resources.map(res => {
+    const catClass = `badge-${res.category.toLowerCase()}`;
+    const isSynced = Boolean(res.openwebui_file_id);
+    const syncBadge = isSynced 
+      ? `<span class="res-sync-badge is-synced">✓ VECTORIZED</span>`
+      : `<span class="res-sync-badge is-pending">⏳ PENDING SYNC</span>`;
+
+    let cleanDate = "Never";
+    if (res.updated_at) {
+      cleanDate = res.updated_at.replace("T", " ").slice(0, 16) + " UTC";
+    }
+
+    return `
+      <div class="resource-card" data-id="${res.id}">
+        <div class="res-card-header">
+          <div class="res-card-badges">
+            <span class="res-category-badge ${catClass}">${res.category.replace("_", " ")}</span>
+            ${syncBadge}
+          </div>
+          <span style="font-family:var(--mono); font-size:10px; color:var(--quiet);">${res.id.slice(0, 16)}</span>
+        </div>
+        <div>
+          <h4 class="res-card-title">${escapeHtml(res.title)}</h4>
+          <p class="res-card-summary">${escapeHtml(res.summary || res.content.slice(0, 140))}</p>
+        </div>
+        <div class="res-card-meta">
+          <span>Source: ${escapeHtml((res.source_url_or_path || "Direct Input").slice(0, 28))}</span>
+          <span>${cleanDate}</span>
+        </div>
+        <div class="res-card-actions">
+          <button type="button" class="button button-small" onclick="viewResourceDetail('${res.id}')">📄 View Dossier</button>
+          <button type="button" class="button button-small button-danger" onclick="deleteResourceItem('${res.id}', '${escapeHtml(res.title)}')">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function viewResourceDetail(resourceId) {
+  try {
+    const res = await fetch(`/api/resources/${resourceId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const r = data.resource;
+    currentViewResourceId = r.id;
+
+    const modal = document.querySelector("#modal-view-resource");
+    const titleEl = document.querySelector("#view-res-title");
+    const badgesEl = document.querySelector("#view-res-badges");
+    const metaEl = document.querySelector("#view-res-meta");
+    const summaryEl = document.querySelector("#view-res-summary");
+    const contentEl = document.querySelector("#view-res-content");
+
+    if (titleEl) titleEl.textContent = r.title;
+    if (badgesEl) {
+      const catClass = `badge-${r.category.toLowerCase()}`;
+      const isSynced = Boolean(r.openwebui_file_id);
+      badgesEl.innerHTML = `
+        <span class="res-category-badge ${catClass}">${r.category.replace("_", " ")}</span>
+        <span class="res-sync-badge ${isSynced ? 'is-synced' : 'is-pending'}">${isSynced ? '✓ VECTORIZED IN OPEN-WEBUI' : '⏳ PENDING SYNC'}</span>
+      `;
+    }
+    if (metaEl) {
+      metaEl.innerHTML = `
+        <span>ID: <code>${r.id}</code></span>
+        <span>Source: <strong>${escapeHtml(r.source_url_or_path || 'Manual')}</strong></span>
+        <span>Updated: <strong>${r.updated_at ? r.updated_at.slice(0, 19).replace('T', ' ') : 'N/A'}</strong></span>
+        <span>Auto-Sync: <strong>${r.auto_update ? 'YES (02:00 UTC)' : 'NO'}</strong></span>
+      `;
+    }
+    if (summaryEl) {
+      summaryEl.textContent = r.summary || "No executive summary provided.";
+    }
+    if (contentEl) {
+      contentEl.textContent = r.content;
+    }
+
+    if (modal) modal.hidden = false;
+  } catch (err) {
+    showToast(`Failed to view resource: ${err.message}`, "error", 2500);
+  }
+}
+
+async function deleteResourceItem(resourceId, title) {
+  if (!confirm(`Are you sure you want to delete "${title}"? This will also remove it from Open-WebUI vector memory.`)) {
+    return;
+  }
+  try {
+    const res = await fetch(`/api/resources/${resourceId}`, { method: "DELETE" });
+    if (res.ok) {
+      showToast(`Deleted resource: ${title}`, "info", 2000);
+      const viewModal = document.querySelector("#modal-view-resource");
+      if (viewModal) viewModal.hidden = true;
+      loadResourcesHub();
+    } else {
+      const err = await res.json();
+      showToast(`Deletion failed: ${err.message}`, "error", 3000);
+    }
+  } catch (err) {
+    showToast(`Deletion error: ${err.message}`, "error", 3000);
+  }
+}
+
+function initResourceHub() {
+  // Category Pill Filter Clicks
+  document.querySelectorAll(".res-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll(".res-pill").forEach(p => p.classList.remove("is-active"));
+      pill.classList.add("is-active");
+      currentResourceCategory = pill.dataset.category || "ALL";
+      loadResourcesHub();
+    });
+  });
+
+  // Search Input live filtering
+  const searchInput = document.querySelector("#res-search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.toLowerCase().trim();
+      if (!q) {
+        renderResourcesGrid(allLoadedResources);
+        return;
+      }
+      const filtered = allLoadedResources.filter(r => 
+        (r.title && r.title.toLowerCase().includes(q)) ||
+        (r.summary && r.summary.toLowerCase().includes(q)) ||
+        (r.content && r.content.toLowerCase().includes(q)) ||
+        (r.category && r.category.toLowerCase().includes(q)) ||
+        (r.id && r.id.toLowerCase().includes(q))
+      );
+      renderResourcesGrid(filtered);
+    });
+  }
+
+  // Modals management
+  const addModal = document.querySelector("#modal-add-resource");
+  const viewModal = document.querySelector("#modal-view-resource");
+  const btnOpenAdd = document.querySelector("#btn-open-add-resource");
+  const btnCloseAdd = document.querySelector("#btn-close-add-resource");
+  const btnCancelAdd = document.querySelector("#btn-cancel-add-resource");
+  const btnCloseView = document.querySelector("#btn-close-view-resource");
+  const btnDismissView = document.querySelector("#btn-dismiss-view-resource");
+  const btnDeleteView = document.querySelector("#btn-delete-view-resource");
+
+  if (btnOpenAdd) btnOpenAdd.addEventListener("click", () => { if (addModal) addModal.hidden = false; });
+  if (btnCloseAdd) btnCloseAdd.addEventListener("click", () => { if (addModal) addModal.hidden = true; });
+  if (btnCancelAdd) btnCancelAdd.addEventListener("click", () => { if (addModal) addModal.hidden = true; });
+  if (btnCloseView) btnCloseView.addEventListener("click", () => { if (viewModal) viewModal.hidden = true; });
+  if (btnDismissView) btnDismissView.addEventListener("click", () => { if (viewModal) viewModal.hidden = true; });
+  if (btnDeleteView) {
+    btnDeleteView.addEventListener("click", () => {
+      if (currentViewResourceId) {
+        deleteResourceItem(currentViewResourceId, "selected resource");
+      }
+    });
+  }
+
+  // Ingest Mode Tabs (Manual vs URL vs Upload)
+  const modeBtns = document.querySelectorAll(".res-mode-btn");
+  let activeMode = "manual";
+  modeBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      modeBtns.forEach(b => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      activeMode = btn.dataset.mode;
+
+      const secManual = document.querySelector("#res-mode-manual");
+      const secUrl = document.querySelector("#res-mode-url");
+      const secUpload = document.querySelector("#res-mode-upload");
+      if (secManual) secManual.hidden = activeMode !== "manual";
+      if (secUrl) secUrl.hidden = activeMode !== "url";
+      if (secUpload) secUpload.hidden = activeMode !== "upload";
+    });
+  });
+
+  // CSV Dropzone
+  const dropzone = document.querySelector("#csv-dropzone");
+  const fileInput = document.querySelector("#add-res-file");
+  const fileNameLabel = document.querySelector("#selected-file-name");
+
+  if (dropzone && fileInput) {
+    dropzone.addEventListener("click", () => fileInput.click());
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = "var(--accent)";
+    });
+    dropzone.addEventListener("dragleave", () => {
+      dropzone.style.borderColor = "var(--line)";
+    });
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = "var(--line)";
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        fileInput.files = e.dataTransfer.files;
+        if (fileNameLabel) fileNameLabel.textContent = `Selected: ${fileInput.files[0].name} (${(fileInput.files[0].size / 1024).toFixed(1)} KB)`;
+      }
+    });
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files && fileInput.files.length > 0) {
+        if (fileNameLabel) fileNameLabel.textContent = `Selected: ${fileInput.files[0].name} (${(fileInput.files[0].size / 1024).toFixed(1)} KB)`;
+      }
+    });
+  }
+
+  // Add Resource Form Submission
+  const addForm = document.querySelector("#form-add-resource");
+  const addStatus = document.querySelector("#add-res-status");
+
+  if (addForm) {
+    addForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (addStatus) {
+        addStatus.textContent = "Ingesting and synthesizing resource...";
+        addStatus.className = "status-msg";
+      }
+
+      const category = document.querySelector("#add-res-category")?.value || "WEBSITE";
+      const title = document.querySelector("#add-res-title-input")?.value || "";
+      const summary = document.querySelector("#add-res-summary")?.value || "";
+      const content = document.querySelector("#add-res-content")?.value || "";
+      const url = document.querySelector("#add-res-url")?.value || "";
+      const tags = document.querySelector("#add-res-tags")?.value || "";
+      const autoUpdate = document.querySelector("#add-res-autoupdate")?.checked ? 1 : 0;
+
+      try {
+        if (activeMode === "upload") {
+          // Multipart file upload
+          if (!fileInput.files || fileInput.files.length === 0) {
+            throw new Error("Please select a CSV or JSON file to upload.");
+          }
+          const fd = new FormData();
+          fd.append("file", fileInput.files[0]);
+          fd.append("symbol", document.querySelector("#add-res-csv-symbol")?.value || "ASSET");
+          fd.append("timeframe", document.querySelector("#add-res-csv-timeframe")?.value || "1d");
+          if (title) fd.append("title", title);
+
+          const res = await fetch("/api/resources/upload", { method: "POST", body: fd });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || "Upload failed");
+          showToast(`Ingested historical dataset: ${data.resource?.title}`, "success", 2500);
+        } else if (activeMode === "url") {
+          // URL Ingestion
+          if (!url) throw new Error("Please enter a valid web URL.");
+          const res = await fetch("/api/resources", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              category: "WEBSITE",
+              title: title || url,
+              source_url_or_path: url,
+              auto_update: autoUpdate,
+              metadata_json: { tags: tags.split(",").map(t => t.trim()).filter(Boolean) }
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || "URL ingestion failed");
+          showToast(`Ingested web resource: ${data.resource?.title}`, "success", 2500);
+        } else {
+          // Manual input
+          if (!content) throw new Error("Please enter document content or formula code.");
+          const res = await fetch("/api/resources", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              category,
+              title,
+              summary,
+              content,
+              auto_update: autoUpdate,
+              metadata_json: { tags: tags.split(",").map(t => t.trim()).filter(Boolean) }
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || "Failed to save resource");
+          showToast(`Saved resource: ${data.resource?.title}`, "success", 2500);
+        }
+
+        if (addModal) addModal.hidden = true;
+        addForm.reset();
+        loadResourcesHub();
+      } catch (err) {
+        if (addStatus) {
+          addStatus.textContent = err.message;
+          addStatus.className = "status-msg color-red";
+        }
+        showToast(`Resource error: ${err.message}`, "error", 3000);
+      }
+    });
+  }
+
+  // Trigger Open-WebUI Sync
+  const btnSyncNow = document.querySelector("#btn-sync-resources-now");
+  if (btnSyncNow) {
+    btnSyncNow.addEventListener("click", async () => {
+      btnSyncNow.disabled = true;
+      btnSyncNow.textContent = "⚡ Syncing to Open-WebUI...";
+      showToast("Syncing all resources to Open-WebUI RAG vector storage...", "info", 3000);
+
+      try {
+        const res = await fetch("/api/resources/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force: true })
+        });
+        const data = await res.json();
+        if (data.status === "offline") {
+          showToast(`Open-WebUI offline: ${data.message}`, "error", 3500);
+        } else {
+          showToast(`Open-WebUI Sync: ${data.items_synced} files vectorized in ${data.duration_ms}ms`, "success", 3000);
+        }
+        loadResourcesHub();
+      } catch (err) {
+        showToast(`Sync error: ${err.message}`, "error", 3000);
+      } finally {
+        btnSyncNow.disabled = false;
+        btnSyncNow.textContent = "⚡ Sync Open-WebUI Now";
+      }
+    });
+  }
+
+  // Trigger Nightly Refresh Run
+  const btnNightlyRun = document.querySelector("#btn-run-nightly-now");
+  if (btnNightlyRun) {
+    btnNightlyRun.addEventListener("click", async () => {
+      btnNightlyRun.disabled = true;
+      btnNightlyRun.textContent = "🌙 Running Nightly Sync...";
+      showToast("Executing automated 02:00 UTC nightly refresh routine...", "info", 3000);
+
+      try {
+        const res = await fetch("/api/resources/nightly-run", { method: "POST" });
+        const data = await res.json();
+        const synced = data.sync_result?.items_synced || 0;
+        showToast(`Nightly refresh complete: ${data.refreshed_resources?.length || 0} feeds updated, ${synced} vectorized in ${data.duration_ms}ms`, "success", 3500);
+        loadResourcesHub();
+      } catch (err) {
+        showToast(`Nightly refresh error: ${err.message}`, "error", 3000);
+      } finally {
+        btnNightlyRun.disabled = false;
+        btnNightlyRun.textContent = "🌙 Nightly Refresh";
+      }
+    });
+  }
+
+  // Seed default quant library button
+  const btnSeed = document.querySelector("#btn-seed-resources");
+  if (btnSeed) {
+    btnSeed.addEventListener("click", async () => {
+      showToast("Seeding foundational quant formulas and profiles...", "info", 2000);
+      try {
+        const res = await fetch("/api/resources/nightly-run", { method: "POST" });
+        if (res.ok) {
+          showToast("Quant knowledge base seeded and refreshed!", "success", 2500);
+          loadResourcesHub();
+        }
+      } catch (e) {
+        showToast(`Seed failed: ${e.message}`, "error", 2500);
+      }
+    });
+  }
+
+  // Refresh sync logs button
+  const btnRefreshLogs = document.querySelector("#btn-refresh-sync-logs");
+  if (btnRefreshLogs) {
+    btnRefreshLogs.addEventListener("click", () => {
+      loadResourcesHub();
+      showToast("Refreshed sync audit logs", "info", 1500);
+    });
+  }
+}
+
 // Global initialization of new workflow & copilot modules
 initWorkflowController();
 initQuantCopilot();
 initAdminControls();
 initCommandPalette();
 initShortcutsModal();
+initResourceHub();
 initGlobalShortcuts();
 applyWorkspaceViewMode();
 renderWatchlist();

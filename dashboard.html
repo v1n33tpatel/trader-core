@@ -93,6 +93,7 @@
         <button class="broker-tab" id="tab-ctrader" type="button" role="tab" aria-selected="false" data-broker="ctrader">cTrader (Forex)</button>
         <button class="broker-tab" id="tab-quantai" type="button" role="tab" aria-selected="false" data-broker="quantai">QuantAI</button>
         <button class="broker-tab broker-tab-intel" id="tab-intel" type="button" role="tab" aria-selected="false" data-broker="intel">⚡ Market Intel (Agent C)</button>
+        <button class="broker-tab broker-tab-resources" id="tab-resources" type="button" role="tab" aria-selected="false" data-broker="resources">📚 Resource Hub &amp; RAG</button>
         <button class="broker-tab broker-tab-admin" id="tab-admin" type="button" role="tab" aria-selected="false" data-broker="admin">⚙ Admin &amp; Control</button>
       </nav>
 
@@ -1675,6 +1676,107 @@
                 </table>
               </div>
             </div>
+        <!-- ============================================================ -->
+        <!-- RESOURCE HUB & QUANTITATIVE KNOWLEDGE INGESTION PANEL        -->
+        <!-- ============================================================ -->
+        <section class="broker-view" id="panel-resources" aria-labelledby="tab-resources" hidden>
+          <div class="resources-panel-container">
+            <!-- Top Control Bar -->
+            <div class="resources-header-card">
+              <div class="resources-title-block">
+                <span class="eyebrow">KNOWLEDGE ENGINE <span>·</span> OPEN-WEBUI FAST RETRIEVAL CLUSTER</span>
+                <h2>Resource Hub &amp; Quantitative Library</h2>
+                <p class="resources-subtitle">Ingest, synthesize, and store Websites, Historical CSV Datasets, SEC Filings, Company Profiles, Equations, and Live Calendars into Open-WebUI's vector RAG memory (<code>192.168.2.15:8080</code>) with nightly automated synchronization (02:00 UTC).</p>
+              </div>
+              <div class="resources-header-actions">
+                <div class="owu-badge-status" id="res-owu-status-badge">
+                  <span class="status-dot" id="res-owu-dot"></span>
+                  <span id="res-owu-status-text">OWU: Checking...</span>
+                </div>
+                <button type="button" class="button button-small" id="btn-open-add-resource">+ Add Resource</button>
+                <button type="button" class="button button-small" id="btn-run-nightly-now" title="Trigger full 02:00 UTC refresh routine now">🌙 Nightly Refresh</button>
+                <button type="button" class="button button-primary" id="btn-sync-resources-now">⚡ Sync Open-WebUI Now</button>
+              </div>
+            </div>
+
+            <!-- Telemetry & Metrics HUD Strip -->
+            <div class="resources-hud-strip">
+              <div class="hud-stat-box">
+                <span class="hud-stat-label">TOTAL RESOURCES</span>
+                <span class="hud-stat-value" id="hud-total-resources">0</span>
+                <span class="hud-stat-sub">Indexed in StateStore</span>
+              </div>
+              <div class="hud-stat-box">
+                <span class="hud-stat-label">OPEN-WEBUI VECTORIZED</span>
+                <span class="hud-stat-value text-accent" id="hud-synced-resources">0</span>
+                <span class="hud-stat-sub">Active in Vector Memory</span>
+              </div>
+              <div class="hud-stat-box">
+                <span class="hud-stat-label">LAST SYNCHRONIZED</span>
+                <span class="hud-stat-value" id="hud-last-sync-time">Never</span>
+                <span class="hud-stat-sub" id="hud-last-sync-status">Awaiting initial sync</span>
+              </div>
+              <div class="hud-stat-box">
+                <span class="hud-stat-label">NIGHTLY SYNC CYCLE</span>
+                <span class="hud-stat-value text-purple">02:00 UTC</span>
+                <span class="hud-stat-sub">Daily Auto-Refresh Active</span>
+              </div>
+            </div>
+
+            <!-- Filter Categories & Search Bar -->
+            <div class="resources-filter-bar">
+              <div class="res-category-pills" id="res-category-pills">
+                <button type="button" class="res-pill is-active" data-category="ALL">All (<span id="count-all">0</span>)</button>
+                <button type="button" class="res-pill" data-category="EQUATION">📐 Equations (<span id="count-equation">0</span>)</button>
+                <button type="button" class="res-pill" data-category="HISTORICAL_DATA">📊 Historical Data (<span id="count-historical_data">0</span>)</button>
+                <button type="button" class="res-pill" data-category="SEC_DATA">🏛️ SEC Filings (<span id="count-sec_data">0</span>)</button>
+                <button type="button" class="res-pill" data-category="COMPANY">🏢 Companies (<span id="count-company">0</span>)</button>
+                <button type="button" class="res-pill" data-category="CALENDAR">📅 Calendars (<span id="count-calendar">0</span>)</button>
+                <button type="button" class="res-pill" data-category="WEBSITE">🌐 Websites (<span id="count-website">0</span>)</button>
+              </div>
+              <div class="res-search-wrap">
+                <span class="res-search-icon">⌕</span>
+                <input type="text" id="res-search-input" placeholder="Search by title, formula, symbol, or tag (e.g. Kelly, NVDA, CPI, FVG)..." />
+                <button type="button" class="button button-small" id="btn-seed-resources" title="Reset/re-seed default quant formulas and profiles">↻ Seed Quant Library</button>
+              </div>
+            </div>
+
+            <!-- Resources Grid Container -->
+            <div class="resources-grid" id="resources-grid">
+              <!-- Populated dynamically via JS -->
+              <div class="resources-loading-state">
+                <span class="status-dot"></span> Loading resources library...
+              </div>
+            </div>
+
+            <!-- Nightly Audit & Sync Logs Drawer -->
+            <div class="resources-audit-card">
+              <div class="resources-audit-header">
+                <div>
+                  <span class="eyebrow">AUDIT LEDGER <span>·</span> OPEN-WEBUI VECTOR SYNC LOGS</span>
+                  <h3>Recent Nightly &amp; Manual Sync Executions</h3>
+                </div>
+                <button type="button" class="button button-small" id="btn-refresh-sync-logs">↻ Refresh Logs</button>
+              </div>
+              <div class="table-scroll">
+                <table class="holdings-table" id="res-sync-logs-table">
+                  <thead>
+                    <tr>
+                      <th>SYNC ID</th>
+                      <th>TRIGGER</th>
+                      <th>SYNCED AT (UTC)</th>
+                      <th>ITEMS SYNCED</th>
+                      <th>ITEMS FAILED</th>
+                      <th>STATUS</th>
+                      <th>LATENCY</th>
+                    </tr>
+                  </thead>
+                  <tbody id="res-sync-logs-tbody">
+                    <tr><td colspan="7" class="empty-cell">No sync logs recorded yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -1812,6 +1914,130 @@
           <div class="shortcut-row"><span class="shortcut-keys"><kbd>M</kbd></span> <span>Toggle Demo / Real Capital Mode</span></div>
           <div class="shortcut-row"><span class="shortcut-keys"><kbd>?</kbd></span> <span>Open Shortcuts Cheat Sheet</span></div>
           <div class="shortcut-row"><span class="shortcut-keys"><kbd>Esc</kbd></span> <span>Close Any Modal / Dialog</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADD RESOURCE MODAL -->
+    <div id="modal-add-resource" class="modal-backdrop" hidden>
+      <div class="modal-card res-modal-card" role="dialog" aria-modal="true" aria-labelledby="add-res-title">
+        <div class="modal-header">
+          <span class="modal-warning-icon">📥</span>
+          <h3 id="add-res-title">ADD RESOURCE TO KNOWLEDGE ENGINE</h3>
+          <button type="button" class="copilot-btn-close" id="btn-close-add-resource">✕</button>
+        </div>
+        <form id="form-add-resource" class="res-form">
+          <div class="res-form-row">
+            <label class="field-control">
+              <span>RESOURCE CATEGORY</span>
+              <select id="add-res-category" required>
+                <option value="EQUATION">📐 Equation / Quant Model</option>
+                <option value="HISTORICAL_DATA">📊 Historical Data (CSV Upload)</option>
+                <option value="SEC_DATA">🏛️ SEC Corporate Filing (10-K, 10-Q)</option>
+                <option value="COMPANY">🏢 Company Fundamentals &amp; Valuations</option>
+                <option value="CALENDAR">📅 Live Economic Calendar</option>
+                <option value="WEBSITE" selected>🌐 Website / Article / Research URL</option>
+              </select>
+            </label>
+            <label class="field-control">
+              <span>DOCUMENT TITLE</span>
+              <input type="text" id="add-res-title-input" placeholder="e.g. BTCUSDT 15m Binance Dataset, Half-Kelly Formula..." required />
+            </label>
+          </div>
+
+          <!-- Dynamic Ingestion Mode Tabs -->
+          <div class="res-ingest-modes">
+            <button type="button" class="res-mode-btn is-active" data-mode="manual" id="mode-btn-manual">✏️ Manual Input / Markdown</button>
+            <button type="button" class="res-mode-btn" data-mode="url" id="mode-btn-url">🌐 Fetch from Web URL</button>
+            <button type="button" class="res-mode-btn" data-mode="upload" id="mode-btn-upload">📁 Upload Historical CSV</button>
+          </div>
+
+          <!-- Mode 1: Manual Input / Markdown -->
+          <div id="res-mode-manual" class="res-mode-section">
+            <label class="field-control">
+              <span>EXECUTIVE SUMMARY</span>
+              <input type="text" id="add-res-summary" placeholder="Brief 1-2 sentence description for vector search preview..." />
+            </label>
+            <label class="field-control">
+              <span>CONTENT / CODE / MARKDOWN / LATEX</span>
+              <textarea id="add-res-content" rows="6" placeholder="Enter structured analysis, LaTeX mathematical formulation, or filing text..."></textarea>
+            </label>
+          </div>
+
+          <!-- Mode 2: Fetch from Web URL -->
+          <div id="res-mode-url" class="res-mode-section" hidden>
+            <label class="field-control">
+              <span>SOURCE WEB URL</span>
+              <input type="url" id="add-res-url" placeholder="https://example.com/quant-research-paper" />
+              <small class="key-hint">TraderCore will automatically fetch, clean, and vectorize the content into Open-WebUI.</small>
+            </label>
+          </div>
+
+          <!-- Mode 3: Upload Historical CSV -->
+          <div id="res-mode-upload" class="res-mode-section" hidden>
+            <div class="res-csv-dropzone" id="csv-dropzone">
+              <span class="dropzone-icon">📊</span>
+              <p>Drag and drop OHLCV CSV file here, or click to browse</p>
+              <input type="file" id="add-res-file" accept=".csv,.json" hidden />
+              <span id="selected-file-name" class="selected-file-label"></span>
+            </div>
+            <div class="res-form-row" style="margin-top: 10px;">
+              <label class="field-control">
+                <span>ASSET SYMBOL</span>
+                <input type="text" id="add-res-csv-symbol" placeholder="e.g. BTC, ETH, TSLA" value="BTC" />
+              </label>
+              <label class="field-control">
+                <span>TIMEFRAME</span>
+                <select id="add-res-csv-timeframe">
+                  <option value="1m">1-Minute (1m)</option>
+                  <option value="5m">5-Minute (5m)</option>
+                  <option value="15m" selected>15-Minute (15m)</option>
+                  <option value="1h">1-Hour (1h)</option>
+                  <option value="1d">Daily (1d)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="res-form-row">
+            <label class="field-control">
+              <span>TAGS (COMMA-SEPARATED)</span>
+              <input type="text" id="add-res-tags" placeholder="e.g. crypto, momentum, risk, sec" />
+            </label>
+            <label class="field-control checkbox-control" style="justify-content: center;">
+              <input type="checkbox" id="add-res-autoupdate" checked />
+              <span>Include in Nightly Refresh (02:00 UTC)</span>
+            </label>
+          </div>
+
+          <div class="modal-actions">
+            <span id="add-res-status" class="status-msg"></span>
+            <button type="button" class="button button-small" id="btn-cancel-add-resource">Cancel</button>
+            <button type="submit" class="button button-primary" id="btn-submit-add-resource">Save &amp; Ingest Resource</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- VIEW RESOURCE DOSSIER MODAL -->
+    <div id="modal-view-resource" class="modal-backdrop" hidden>
+      <div class="modal-card res-view-card" role="dialog" aria-modal="true" aria-labelledby="view-res-title">
+        <div class="modal-header">
+          <span class="modal-warning-icon">📄</span>
+          <div style="flex:1;">
+            <div class="res-card-badges" id="view-res-badges"></div>
+            <h3 id="view-res-title" style="margin:4px 0 0 0;">RESOURCE DOSSIER</h3>
+          </div>
+          <button type="button" class="copilot-btn-close" id="btn-close-view-resource">✕</button>
+        </div>
+        <div class="res-view-body">
+          <div class="res-view-meta" id="view-res-meta"></div>
+          <div class="res-view-summary-box" id="view-res-summary"></div>
+          <div class="res-view-content" id="view-res-content"></div>
+        </div>
+        <div class="modal-actions" style="justify-content: space-between;">
+          <button type="button" class="button button-danger button-small" id="btn-delete-view-resource">Delete Resource</button>
+          <button type="button" class="button button-small" id="btn-dismiss-view-resource">Close</button>
         </div>
       </div>
     </div>

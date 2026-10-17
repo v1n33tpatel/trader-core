@@ -172,73 +172,110 @@ class OpenWebUIClient:
             return {"status": "error", "message": str(e)}
 
     # =========================================================================
-    # 3. Deploy RAG Knowledge Base & Documents
+    # 3. Knowledge Base & File Primitives
     # =========================================================================
+
+    def get_or_create_knowledge_base(self, name: str, description: str = "") -> Optional[str]:
+        """Finds or creates a Knowledge Base collection and returns its ID."""
+        try:
+            r = requests.get(f"{self.base_url}/api/v1/knowledge/", headers=self._headers(), timeout=5)
+            if r.status_code == 200:
+                for kb in r.json():
+                    if kb.get("name") == name:
+                        return kb.get("id")
+        except Exception:
+            pass
+
+        try:
+            r_create = requests.post(
+                f"{self.base_url}/api/v1/knowledge/create",
+                headers=self._headers(),
+                json={"name": name, "description": description},
+                timeout=10
+            )
+            if r_create.status_code in (200, 201):
+                return r_create.json().get("id")
+        except Exception:
+            pass
+        return None
+
+    def upload_file(self, filename: str, content: bytes, content_type: str = "text/markdown") -> Optional[str]:
+        """Uploads a file multipart to Open-WebUI and returns the resulting file ID."""
+        try:
+            files = {"file": (filename, content, content_type)}
+            upload_headers = {}
+            if self.api_key:
+                upload_headers["Authorization"] = f"Bearer {self.api_key}"
+
+            r = requests.post(
+                f"{self.base_url}/api/v1/files/",
+                headers=upload_headers,
+                files=files,
+                timeout=15
+            )
+            if r.status_code in (200, 201):
+                return r.json().get("id")
+        except Exception:
+            pass
+        return None
+
+    def add_file_to_knowledge_base(self, knowledge_id: str, file_id: str) -> bool:
+        """Binds an uploaded file to a Knowledge Base collection."""
+        try:
+            r = requests.post(
+                f"{self.base_url}/api/v1/knowledge/{knowledge_id}/file/add",
+                headers=self._headers(),
+                json={"file_id": file_id},
+                timeout=10
+            )
+            return r.status_code in (200, 201)
+        except Exception:
+            return False
+
+    def remove_file_from_knowledge_base(self, knowledge_id: str, file_id: str) -> bool:
+        """Unbinds a file from a Knowledge Base collection."""
+        try:
+            r = requests.post(
+                f"{self.base_url}/api/v1/knowledge/{knowledge_id}/file/remove",
+                headers=self._headers(),
+                json={"file_id": file_id},
+                timeout=10
+            )
+            return r.status_code in (200, 201)
+        except Exception:
+            return False
+
+    def delete_file(self, file_id: str) -> bool:
+        """Permanently deletes a file from Open-WebUI storage."""
+        try:
+            r = requests.delete(
+                f"{self.base_url}/api/v1/files/{file_id}",
+                headers=self._headers(),
+                timeout=10
+            )
+            return r.status_code in (200, 204)
+        except Exception:
+            return False
 
     def deploy_rag_playbooks(self) -> Dict[str, Any]:
         """Creates the RAG Knowledge Base and uploads the 4 quant playbooks."""
         kb_name = "TraderCore Quantitative Playbook & Market Intel"
         kb_desc = "Institutional Price Action rules, RiskSentinel guardrails, multi-broker standards, and live trade journal."
 
-        knowledge_id = None
-        # 1. Check existing Knowledge Base
-        try:
-            r = requests.get(f"{self.base_url}/api/v1/knowledge/", headers=self._headers(), timeout=5)
-            if r.status_code == 200:
-                for kb in r.json():
-                    if kb.get("name") == kb_name:
-                        knowledge_id = kb.get("id")
-                        break
-        except Exception:
-            pass
-
-        # 2. Create Knowledge Base if not exists
+        knowledge_id = self.get_or_create_knowledge_base(kb_name, kb_desc)
         if not knowledge_id:
-            try:
-                r_create = requests.post(
-                    f"{self.base_url}/api/v1/knowledge/create",
-                    headers=self._headers(),
-                    json={"name": kb_name, "description": kb_desc},
-                    timeout=10
-                )
-                if r_create.status_code in (200, 201):
-                    knowledge_id = r_create.json().get("id")
-                else:
-                    return {"status": "error", "message": f"Failed to create Knowledge Base: {r_create.text}"}
-            except Exception as e:
-                return {"status": "error", "message": f"Knowledge create failed: {str(e)}"}
+            return {"status": "error", "message": "Failed to resolve or create Knowledge Base"}
 
-        # 3. Upload & Bind RAG Documents
         docs = get_all_rag_documents()
         uploaded_files = []
         for doc in docs:
             fname = doc["filename"]
             fcontent = doc["content"].encode("utf-8")
-            try:
-                # Upload file multipart
-                files = {"file": (fname, fcontent, "text/markdown")}
-                upload_headers = {}
-                if self.api_key:
-                    upload_headers["Authorization"] = f"Bearer {self.api_key}"
-
-                r_upload = requests.post(
-                    f"{self.base_url}/api/v1/files/",
-                    headers=upload_headers,
-                    files=files,
-                    timeout=15
-                )
-                if r_upload.status_code in (200, 201):
-                    file_id = r_upload.json().get("id")
-                    # Bind file to Knowledge Base
-                    if file_id and knowledge_id:
-                        requests.post(
-                            f"{self.base_url}/api/v1/knowledge/{knowledge_id}/file/add",
-                            headers=self._headers(),
-                            json={"file_id": file_id},
-                            timeout=10
-                        )
-                        uploaded_files.append({"filename": fname, "file_id": file_id})
-            except Exception:
+            file_id = self.upload_file(fname, fcontent, "text/markdown")
+            if file_id:
+                self.add_file_to_knowledge_base(knowledge_id, file_id)
+                uploaded_files.append({"filename": fname, "file_id": file_id})
+            else:
                 uploaded_files.append({"filename": fname, "status": "skipped"})
 
         return {
