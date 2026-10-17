@@ -131,12 +131,20 @@ def _api_statuses() -> dict[str, dict[str, str]]:
 
 @research_blueprint.get("/dashboard.css")
 def dashboard_css():
-    return send_from_directory(PROJECT_ROOT, "dashboard.css", mimetype="text/css")
+    resp = send_from_directory(PROJECT_ROOT, "dashboard.css", mimetype="text/css")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @research_blueprint.get("/dashboard.js")
 def dashboard_js():
-    return send_from_directory(PROJECT_ROOT, "dashboard.js", mimetype="text/javascript")
+    resp = send_from_directory(PROJECT_ROOT, "dashboard.js", mimetype="text/javascript")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @research_blueprint.get("/logo/MonetMakingMachine-logo.jpg")
