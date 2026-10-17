@@ -345,3 +345,7 @@ STRUCTURE YOUR BRIEFING EXACTLY AS:
             "company": company,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+
+
+# Alias for workflow and copilot modules
+AgentCMarketIntel = AgentCSentinel

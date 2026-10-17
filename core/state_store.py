@@ -69,3 +69,15 @@ class StateStore:
             cursor = conn.execute("SELECT key, value FROM settings")
             return {row[0]: row[1] for row in cursor.fetchall()}
 
+    def get_positions(self, limit: int = 50) -> list[dict]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM positions ORDER BY opened_at DESC LIMIT ?", (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_daily_audits(self, limit: int = 30) -> list[dict]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM daily_audit ORDER BY date DESC LIMIT ?", (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+

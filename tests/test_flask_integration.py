@@ -44,7 +44,7 @@ def test_api_status_reports_states_without_secrets(monkeypatch: pytest.MonkeyPat
     statuses = response.get_json()
 
     assert response.status_code == 200
-    assert set(statuses) == {"dashboard", "t212", "etoro", "yahoo", "binance", "kraken", "ollama"}
+    assert set(statuses) == {"dashboard", "t212", "etoro", "yahoo", "binance", "kraken", "ctrader", "ollama"}
     assert statuses["dashboard"]["status"] == "online"
     assert all(item["status"] in {"online", "offline", "unconfigured"} for item in statuses.values())
     assert "api_key" not in response.get_data(as_text=True).lower()

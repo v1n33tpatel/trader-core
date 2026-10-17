@@ -128,14 +128,15 @@ def test_admin_agents_telemetry(client, monkeypatch):
     res = client.get("/api/admin/agents")
     assert res.status_code == 200
     data = res.get_json()
-    assert "agents" in data
-    assert len(data["agents"]) == 5
+    assert len(data["agents"]) >= 8
     agent_ids = [a["id"] for a in data["agents"]]
     assert "agent_a" in agent_ids
     assert "agent_b" in agent_ids
     assert "agent_c" in agent_ids
     assert "engine_loop" in agent_ids
     assert "risk_sentinel" in agent_ids
+    assert "strategy_scanner" in agent_ids
+    assert "order_execution_engine" in agent_ids
 
 
 def test_ai_config_crud(client):

@@ -65,6 +65,9 @@
             <span class="api-status-item" data-api-status="kraken" data-status="checking" role="listitem" title="Kraken API: checking">
               <span class="api-status-dot" aria-hidden="true"></span><span>KR</span>
             </span>
+            <span class="api-status-item" data-api-status="ctrader" data-status="checking" role="listitem" title="cTrader API: checking">
+              <span class="api-status-dot" aria-hidden="true"></span><span>CT</span>
+            </span>
             <span class="api-status-item" data-api-status="ollama" data-status="checking" role="listitem" title="Ollama API: checking">
               <span class="api-status-dot" aria-hidden="true"></span><span>AI</span>
             </span>
@@ -78,6 +81,7 @@
         <button class="broker-tab" id="tab-etoro" type="button" role="tab" aria-selected="false" data-broker="etoro">eToro Quant Hub</button>
         <button class="broker-tab" id="tab-binance" type="button" role="tab" aria-selected="false" data-broker="binance">Binance Spot</button>
         <button class="broker-tab" id="tab-kraken" type="button" role="tab" aria-selected="false" data-broker="kraken">Kraken Spot</button>
+        <button class="broker-tab" id="tab-ctrader" type="button" role="tab" aria-selected="false" data-broker="ctrader">cTrader (Forex)</button>
         <button class="broker-tab" id="tab-quantai" type="button" role="tab" aria-selected="false" data-broker="quantai">QuantAI</button>
         <button class="broker-tab broker-tab-intel" id="tab-intel" type="button" role="tab" aria-selected="false" data-broker="intel">⚡ Market Intel (Agent C)</button>
         <button class="broker-tab broker-tab-admin" id="tab-admin" type="button" role="tab" aria-selected="false" data-broker="admin">⚙ Admin &amp; Control</button>
@@ -101,6 +105,277 @@
                 <span class="refresh-symbol" aria-hidden="true">↻</span>
                 <span>Refresh T212</span>
               </button>
+            </div>
+          </div>
+
+          <!-- 8-STEP INTERACTIVE QUANTITATIVE TRADE WORKFLOW PIPELINE -->
+          <div class="workflow-card" id="trade-workflow-card">
+            <div class="workflow-header">
+              <div class="workflow-title-block">
+                <span class="eyebrow">TRADE LIFECYCLE <span>·</span> 8-STEP QUANT PIPELINE</span>
+                <div class="workflow-active-line">
+                  <span class="workflow-indicator"></span>
+                  <strong id="wf-header-title">8-Step Trade Workflow: Find Product ➔ Execute</strong>
+                  <span class="wf-step-badge" id="wf-current-badge">STEP 1 OF 8</span>
+                </div>
+              </div>
+              <div class="workflow-actions">
+                <button type="button" class="button button-small" id="btn-wf-reset" title="Reset workflow to Step 1">↺ Reset Workflow</button>
+              </div>
+            </div>
+
+            <!-- Stepper Timeline Navigation Bar -->
+            <div class="workflow-stepper-bar" role="tablist" aria-label="Trade Workflow Steps">
+              <button type="button" class="wf-step-node is-active" data-step="1">
+                <span class="step-num">1</span><span class="step-label">Find Product</span>
+              </button>
+              <button type="button" class="wf-step-node" data-step="2">
+                <span class="step-num">2</span><span class="step-label">Research</span>
+              </button>
+              <button type="button" class="wf-step-node" data-step="3">
+                <span class="step-num">3</span><span class="step-label">Suggest</span>
+              </button>
+              <button type="button" class="wf-step-node" data-step="4">
+                <span class="step-num">4</span><span class="step-label">Analyze</span>
+              </button>
+              <button type="button" class="wf-step-node" data-step="5">
+                <span class="step-num">5</span><span class="step-label">Strategy</span>
+              </button>
+              <button type="button" class="wf-step-node" data-step="6">
+                <span class="step-num">6</span><span class="step-label">Parameters</span>
+              </button>
+              <button type="button" class="wf-step-node" data-step="7">
+                <span class="step-num">7</span><span class="step-label">Test (Demo)</span>
+              </button>
+              <button type="button" class="wf-step-node" data-step="8">
+                <span class="step-num">8</span><span class="step-label">Realtime (Live)</span>
+              </button>
+            </div>
+
+            <!-- Workflow Step Content Panels -->
+            <div class="workflow-panels-container">
+              <!-- STEP 1: Find Product -->
+              <div class="wf-panel is-active" id="wf-panel-1">
+                <div class="wf-panel-header">
+                  <h4>Step 1: Find Product &amp; Asset Discovery</h4>
+                  <span class="wf-panel-desc">Select an asset class and instrument curated for your active broker workspace.</span>
+                </div>
+                <div class="wf-asset-filter-bar">
+                  <span class="filter-label">ASSET CLASS:</span>
+                  <div class="wf-filter-pills" id="wf-asset-pills">
+                    <button type="button" class="wf-filter-pill is-active" data-asset="ALL">ALL</button>
+                    <button type="button" class="wf-filter-pill" data-asset="CRYPTO">CRYPTO</button>
+                    <button type="button" class="wf-filter-pill" data-asset="STOCKS">STOCKS</button>
+                    <button type="button" class="wf-filter-pill" data-asset="ETFS">ETFS</button>
+                    <button type="button" class="wf-filter-pill" data-asset="FOREX">FOREX</button>
+                  </div>
+                </div>
+                <div class="wf-chips-row" id="wf-instrument-chips">
+                  <!-- Chips injected dynamically by dashboard.js based on currentBroker -->
+                </div>
+                <div class="wf-symbol-input-row">
+                  <input type="text" id="wf-symbol-input" class="search-input" placeholder="Or enter custom ticker (e.g. BTCUSDT, NVDA, EURUSD)..." autocomplete="off" />
+                  <button type="button" class="button button-primary" id="btn-wf-step1-next">
+                    <span>⚡ Research Instrument ➔</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- STEP 2: Research -->
+              <div class="wf-panel" id="wf-panel-2" hidden>
+                <div class="wf-panel-header">
+                  <h4>Step 2: Market Intel &amp; Social Feeds Research (Agent C)</h4>
+                  <span class="wf-panel-desc">Live sentiment telemetry from Twitter/X, Discord trader chats, and macro calendars.</span>
+                </div>
+                <div class="wf-intel-grid">
+                  <div class="wf-intel-card">
+                    <span class="metric-label">SOCIAL SENTIMENT (TWITTER/X &amp; DISCORD)</span>
+                    <div class="wf-sentiment-val">
+                      <strong id="wf-sentiment-score">+0.35</strong>
+                      <span class="badge" id="wf-sentiment-badge">BULLISH</span>
+                    </div>
+                    <small id="wf-mention-velocity">120 mentions / hr · Institutional sentiment</small>
+                  </div>
+                  <div class="wf-intel-card">
+                    <span class="metric-label">NEWS HEADLINE &amp; AI VERDICT</span>
+                    <strong id="wf-news-headline" class="wf-headline-text">Loading market news sentiment...</strong>
+                    <small id="wf-news-sentiment">AI Sentiment: BULLISH ACCUMULATION</small>
+                  </div>
+                  <div class="wf-intel-card">
+                    <span class="metric-label">ECONOMIC CALENDAR RISK</span>
+                    <div class="wf-calendar-status">
+                      <span class="status-dot status-dot-online" id="wf-macro-dot"></span>
+                      <strong id="wf-macro-risk">TIER-1 CLEAR (SAFE)</strong>
+                    </div>
+                    <small id="wf-macro-note">No high-impact CPI/FOMC releases within 30m</small>
+                  </div>
+                </div>
+                <div class="wf-panel-footer">
+                  <button type="button" class="button button-small" id="btn-wf-back-1">← Back</button>
+                  <button type="button" class="button button-primary" id="btn-wf-step2-next">Scan Setup &amp; Suggest ➔</button>
+                </div>
+              </div>
+
+              <!-- STEP 3: Suggest -->
+              <div class="wf-panel" id="wf-panel-3" hidden>
+                <div class="wf-panel-header">
+                  <h4>Step 3: AI Setup Screener</h4>
+                  <span class="wf-panel-desc">Algorithmic detection of Price Action liquidity sweeps, FVG imbalances, and momentum regimes.</span>
+                </div>
+                <div class="wf-setup-banner" id="wf-setup-banner">
+                  <div class="wf-setup-info">
+                    <span class="wf-setup-label">DETECTED INSTITUTIONAL SETUP</span>
+                    <h3 id="wf-setup-name" class="wf-setup-title">Bullish Liquidity Sweep &amp; FVG Retest</h3>
+                    <div class="wf-setup-pills">
+                      <span class="badge badge-strat" id="wf-setup-bias">BIAS: BUY</span>
+                      <span class="badge" id="wf-setup-confidence">CONFIDENCE: 85%</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="wf-panel-footer">
+                  <button type="button" class="button button-small" id="btn-wf-back-2">← Back</button>
+                  <button type="button" class="button button-primary" id="btn-wf-step3-next">Deep Structural Analysis ➔</button>
+                </div>
+              </div>
+
+              <!-- STEP 4: Analyze -->
+              <div class="wf-panel" id="wf-panel-4" hidden>
+                <div class="wf-panel-header">
+                  <h4>Step 4: Deep Quantitative &amp; Structural Analysis</h4>
+                  <span class="wf-panel-desc">Structural swing levels, Fair Value Gaps, and Volume Profile distribution.</span>
+                </div>
+                <div class="wf-levels-grid">
+                  <div class="wf-level-box"><span class="metric-label">SWING HIGH (PIVOT)</span><strong id="wf-pivot-high">—</strong></div>
+                  <div class="wf-level-box"><span class="metric-label">SWING LOW (INVALIDATION)</span><strong id="wf-pivot-low">—</strong></div>
+                  <div class="wf-level-box"><span class="metric-label">POINT OF CONTROL (POC)</span><strong id="wf-poc" class="color-gold">—</strong></div>
+                  <div class="wf-level-box"><span class="metric-label">VALUE AREA (VAH / VAL)</span><strong id="wf-va" class="color-cyan">—</strong></div>
+                  <div class="wf-level-box"><span class="metric-label">FVG IMBALANCE ZONE</span><strong id="wf-fvg">—</strong></div>
+                </div>
+                <div class="wf-panel-footer">
+                  <button type="button" class="button button-small" id="btn-wf-back-3">← Back</button>
+                  <button type="button" class="button button-purple" id="btn-wf-chart-load">📈 Load on Candlestick Chart</button>
+                  <button type="button" class="button button-primary" id="btn-wf-step4-next">Match Strategy ➔</button>
+                </div>
+              </div>
+
+              <!-- STEP 5: Strategy -->
+              <div class="wf-panel" id="wf-panel-5" hidden>
+                <div class="wf-panel-header">
+                  <h4>Step 5: Strategy Matching &amp; Model Selection</h4>
+                  <span class="wf-panel-desc">Select quantitative algorithm optimized for this asset class and regime.</span>
+                </div>
+                <div class="wf-strategy-match-card">
+                  <div class="wf-strat-details">
+                    <span class="metric-label">ALIGNED STRATEGY</span>
+                    <h3 id="wf-strat-title">Fair Value Gap Breakout (Hybrid)</h3>
+                    <p id="wf-strat-desc">Enters on confirmation retest of 3-candle imbalance zone with 200 SMA regime filter.</p>
+                  </div>
+                  <button type="button" class="button button-primary" id="btn-wf-apply-strat">✓ Apply Strategy</button>
+                </div>
+                <div class="wf-panel-footer">
+                  <button type="button" class="button button-small" id="btn-wf-back-4">← Back</button>
+                  <button type="button" class="button button-primary" id="btn-wf-step5-next">Calculate Trade Parameters ➔</button>
+                </div>
+              </div>
+
+              <!-- STEP 6: Parameters -->
+              <div class="wf-panel" id="wf-panel-6" hidden>
+                <div class="wf-panel-header">
+                  <h4>Step 6: Mathematical Trade Parameters</h4>
+                  <span class="wf-panel-desc">Strict 1:2 Minimum Risk-to-Reward Ratio with RiskSentinel Sizing Cap.</span>
+                </div>
+                <div class="wf-params-grid">
+                  <div class="wf-param-card">
+                    <span class="metric-label">SUGGESTED ENTRY</span>
+                    <strong id="wf-param-entry" class="param-val">—</strong>
+                    <small>Market / FVG Limit</small>
+                  </div>
+                  <div class="wf-param-card param-card-stop">
+                    <span class="metric-label">STRUCTURAL STOP-LOSS</span>
+                    <strong id="wf-param-stop" class="param-val color-red">—</strong>
+                    <small id="wf-param-risk-pct">-1.5% Risk (Under Rejection Wick)</small>
+                  </div>
+                  <div class="wf-param-card param-card-tp">
+                    <span class="metric-label">TAKE-PROFIT TARGET</span>
+                    <strong id="wf-param-tp" class="param-val color-green">—</strong>
+                    <small id="wf-param-rr">Target R:R 1:2.2 (≥ 1:2 Mandatory)</small>
+                  </div>
+                  <div class="wf-param-card param-card-size">
+                    <span class="metric-label">RECOMMENDED ORDER SIZE</span>
+                    <strong id="wf-param-size" class="param-val color-blue">$50.00</strong>
+                    <small id="wf-param-units">Units: — · RiskSentinel Cap</small>
+                  </div>
+                </div>
+                <div class="wf-panel-footer">
+                  <button type="button" class="button button-small" id="btn-wf-back-5">← Back</button>
+                  <button type="button" class="button button-primary" id="btn-wf-step6-next">Test in Demo Mode ➔</button>
+                </div>
+              </div>
+
+              <!-- STEP 7: Test (Demo) -->
+              <div class="wf-panel" id="wf-panel-7" hidden>
+                <div class="wf-panel-header">
+                  <h4>Step 7: Test (Demo / Forward Simulation)</h4>
+                  <span class="wf-panel-desc">Practice trade execution in safe virtual portfolio and run quick backtest metrics.</span>
+                </div>
+                <div class="wf-demo-grid">
+                  <div class="wf-demo-box">
+                    <span class="metric-label">HISTORICAL SHARPE</span>
+                    <strong id="wf-demo-sharpe">1.85</strong>
+                  </div>
+                  <div class="wf-demo-box">
+                    <span class="metric-label">MAX DRAWDOWN</span>
+                    <strong id="wf-demo-maxdd">-6.4%</strong>
+                  </div>
+                  <div class="wf-demo-box">
+                    <span class="metric-label">ESTIMATED WIN RATE</span>
+                    <strong id="wf-demo-winrate">64.2%</strong>
+                  </div>
+                  <div class="wf-demo-box">
+                    <span class="metric-label">RISK ENVELOPE</span>
+                    <strong class="color-green">PASSED</strong>
+                  </div>
+                </div>
+                <div class="wf-demo-actions">
+                  <button type="button" class="button button-primary" id="btn-wf-demo-execute">
+                    <span>📝 Execute in Demo Portfolio</span>
+                  </button>
+                  <span id="wf-demo-msg" class="status-msg"></span>
+                </div>
+                <div class="wf-panel-footer">
+                  <button type="button" class="button button-small" id="btn-wf-back-6">← Back</button>
+                  <button type="button" class="button button-red" id="btn-wf-step7-next">Proceed to Realtime Live Execution ➔</button>
+                </div>
+              </div>
+
+              <!-- STEP 8: Realtime (Live) -->
+              <div class="wf-panel" id="wf-panel-8" hidden>
+                <div class="wf-panel-header">
+                  <h4>Step 8: Realtime (Real Money Execution)</h4>
+                  <span class="wf-panel-desc">Arm and submit verified trade order to active live broker endpoint.</span>
+                </div>
+                <div class="wf-live-warning-box">
+                  <div class="warning-title">
+                    <span class="modal-warning-icon">⚠️</span>
+                    <strong>REAL CAPITAL GUARDRAIL VERIFICATION</strong>
+                  </div>
+                  <ul class="wf-check-list">
+                    <li>✓ RiskSentinel Hard Stop anchored at structural level (≤ 2.0% equity risk).</li>
+                    <li>✓ Target Profit exceeds 1:2 Risk/Reward ratio constraint.</li>
+                    <li>✓ Macro Sentinel verified: zero high-impact Tier-1 economic releases within 30 minutes.</li>
+                    <li>✓ Order size verified within $50 RiskSentinel maximum single-order allocation.</li>
+                  </ul>
+                </div>
+                <div class="wf-live-actions">
+                  <button type="button" class="button button-red button-large" id="btn-wf-live-execute">
+                    <span>🚀 Arm &amp; Execute Live Order</span>
+                  </button>
+                  <span id="wf-live-msg" class="status-msg"></span>
+                </div>
+                <div class="wf-panel-footer">
+                  <button type="button" class="button button-small" id="btn-wf-back-7">← Back to Demo</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -875,6 +1150,41 @@
                 </div>
 
                 <div class="key-group">
+                  <div class="key-group-title">cTrader Open API (Forex &amp; Commodities)</div>
+                  <div class="key-fields">
+                    <label class="field-control">
+                      <span>CLIENT ID</span>
+                      <div class="input-with-button">
+                        <input id="key-ctrader-id" type="password" placeholder="Paste cTrader Client ID..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="key-ctrader-id" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-ctrader-id">Current: Not configured</small>
+                    </label>
+                    <label class="field-control">
+                      <span>CLIENT SECRET</span>
+                      <div class="input-with-button">
+                        <input id="sec-ctrader-val" type="password" placeholder="Paste cTrader Client Secret..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="sec-ctrader-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-ctrader-sec">Current: Not configured</small>
+                    </label>
+                    <label class="field-control">
+                      <span>ACCOUNT ID (CTID)</span>
+                      <input id="acc-ctrader-val" type="text" placeholder="e.g. 1234567" />
+                      <small class="key-hint" id="hint-ctrader-acc">Current: Not configured</small>
+                    </label>
+                    <label class="field-control">
+                      <span>ACCESS TOKEN</span>
+                      <div class="input-with-button">
+                        <input id="tok-ctrader-val" type="password" placeholder="Paste OAuth Access Token..." autocomplete="new-password" />
+                        <button type="button" class="btn-toggle-vis" data-target="tok-ctrader-val" title="Toggle visibility">👁</button>
+                      </div>
+                      <small class="key-hint" id="hint-ctrader-tok">Current: Not configured</small>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="key-group">
                   <div class="key-group-title">Agent C · xAI Grok &amp; Discord Stream Keys</div>
                   <div class="key-fields">
                     <label class="field-control">
@@ -1185,6 +1495,86 @@
                 </ol>
               </div>
             </div>
+
+            <!-- 6. RISKSENTINEL GUARDRAIL BOUNDS -->
+            <div class="admin-card bounds-card">
+              <div class="admin-card-header">
+                <div>
+                  <span class="eyebrow">CAPITAL SENTINEL <span>·</span> GLOBAL RISK BOUNDS</span>
+                  <h3>RiskSentinel Hard Parameters</h3>
+                </div>
+                <span class="vault-safe-badge"><span class="status-dot"></span>ENFORCED AT REST</span>
+              </div>
+              <p class="vault-desc">Configure institutional capital preservation parameters enforced across all broker adapters and autonomous execution loops.</p>
+
+              <form id="form-risksentinel-bounds" class="bounds-form">
+                <div class="ai-controls-grid">
+                  <label class="field-control">
+                    <span>MAX SINGLE ORDER SIZE (USD)</span>
+                    <input id="bounds-max-order" type="number" step="5" min="10" max="1000" value="50.0" />
+                    <small class="key-hint">Hard ceiling per execution</small>
+                  </label>
+                  <label class="field-control">
+                    <span>HARD STRATEGY STOP-LOSS (%)</span>
+                    <input id="bounds-stop-loss" type="number" step="0.1" min="0.5" max="10" value="2.0" />
+                    <small class="key-hint">In-flight trade invalidation stop</small>
+                  </label>
+                  <label class="field-control">
+                    <span>DAILY CIRCUIT BREAKER (%)</span>
+                    <input id="bounds-circuit-breaker" type="number" step="0.5" min="1.0" max="10" value="3.0" />
+                    <small class="key-hint">Auto-halts all trading for 24h on hit</small>
+                  </label>
+                  <label class="field-control">
+                    <span>MAX CONCURRENT POSITIONS</span>
+                    <input id="bounds-max-positions" type="number" step="1" min="1" max="20" value="5" />
+                    <small class="key-hint">Total open portfolio slots</small>
+                  </label>
+                  <label class="field-control">
+                    <span>MINIMUM RISK-TO-REWARD (R:R)</span>
+                    <input id="bounds-min-rr" type="number" step="0.1" min="1.0" max="5.0" value="2.0" />
+                    <small class="key-hint">Mandatory profit target distance</small>
+                  </label>
+                </div>
+                <div class="orchestrator-actions-bar">
+                  <div class="ai-status-row">
+                    <span id="bounds-save-status" class="status-msg"></span>
+                  </div>
+                  <button type="submit" class="button button-primary" id="btn-save-bounds">Save RiskSentinel Bounds</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- 7. AUDIT LEDGER & RECENT TRADES -->
+            <div class="admin-card audit-card">
+              <div class="admin-card-header">
+                <div>
+                  <span class="eyebrow">PERSISTENCE <span>·</span> SQLITE STATESTORE</span>
+                  <h3>Real-Time Audit Ledger &amp; Trade History</h3>
+                </div>
+                <button type="button" class="button button-small" id="btn-refresh-ledger">↻ Refresh Ledger</button>
+              </div>
+              <p class="vault-desc">Live trade records and daily PnL audits stored in <code>trader_state.db</code>.</p>
+              
+              <div class="table-scroll">
+                <table class="holdings-table" id="audit-ledger-table">
+                  <thead>
+                    <tr>
+                      <th>POSITION ID</th>
+                      <th>SYMBOL</th>
+                      <th>BROKER</th>
+                      <th>SIDE</th>
+                      <th>UNITS</th>
+                      <th>ENTRY PRICE</th>
+                      <th>OPENED AT</th>
+                      <th>STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody id="audit-ledger-tbody">
+                    <tr><td colspan="8" class="empty-cell">No trade records found in StateStore.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -1215,6 +1605,68 @@
         <span>READ-ONLY DASHBOARD <span class="footer-separator">·</span> BACKTESTS DO NOT PLACE ORDERS</span>
       </footer>
     </div>
+
+    <!-- FLOATING AI QUANT COPILOT CHATBOT DRAWER -->
+    <div id="quant-copilot-container" class="copilot-container">
+      <!-- Floating Launcher Toggle Button -->
+      <button type="button" id="btn-copilot-toggle" class="copilot-toggle-btn" aria-label="Open AI Quant Copilot">
+        <span class="copilot-pulse-dot"></span>
+        <span class="copilot-icon">💬</span>
+        <span class="copilot-label">Quant Copilot</span>
+        <span class="copilot-model-tag" id="copilot-model-pill">llama3.1:8b</span>
+      </button>
+
+      <!-- Floating Chatbot Window -->
+      <div id="copilot-window" class="copilot-window" hidden>
+        <div class="copilot-header">
+          <div class="copilot-header-title">
+            <span class="copilot-status-dot"></span>
+            <strong>Quant Copilot AI</strong>
+            <select id="copilot-active-model" class="copilot-model-select" aria-label="Select Copilot Model">
+              <option value="llama3.1:8b" selected>Llama 3.1 8B (Fast Dispatcher)</option>
+              <option value="deepseek-r1:14b">DeepSeek-R1 14B (Quant Reasoner)</option>
+              <option value="deepseek-r1:7b">DeepSeek-R1 7B (Fallback Reasoner)</option>
+              <option value="qwen2.5-coder:14b">Qwen 2.5 Coder 14B</option>
+            </select>
+          </div>
+          <div class="copilot-header-actions">
+            <button type="button" class="copilot-btn-min" id="btn-copilot-clear" title="Clear chat history">🧹</button>
+            <button type="button" class="copilot-btn-close" id="btn-copilot-close" title="Close Copilot">✕</button>
+          </div>
+        </div>
+
+        <!-- Quick Context / Filter Chips -->
+        <div class="copilot-chips-bar">
+          <button type="button" class="copilot-chip" data-query="What is the institutional market structure on BTC?">BTC Structure</button>
+          <button type="button" class="copilot-chip" data-query="Analyze recent Twitter and Discord sentiment for NVDA">NVDA Sentiment</button>
+          <button type="button" class="copilot-chip" data-query="Show EURUSD key liquidity sweeps and session levels">EURUSD Sweeps</button>
+          <button type="button" class="copilot-chip" data-query="Help me configure a trade for SPY with 1:2 R:R">Trade Configurator</button>
+        </div>
+
+        <!-- Chat Messages Scroll Area -->
+        <div class="copilot-messages" id="copilot-messages">
+          <div class="copilot-msg msg-assistant">
+            <div class="msg-bubble">
+              <strong>Hello! I am your Quant Copilot.</strong><br/>
+              I can help you:
+              <ul>
+                <li>Analyze <strong>Stocks, ETFs, Crypto, and FOREX</strong> market structures.</li>
+                <li>Scan <strong>Twitter/X &amp; Discord sentiment</strong> and macro news via Agent C.</li>
+                <li>Configure 8-step trades with <strong>mandatory 1:2 R:R</strong> and RiskSentinel safety bounds.</li>
+              </ul>
+              <em>Type a question or click a quick prompt above to begin.</em>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Input Form -->
+        <form id="copilot-form" class="copilot-input-form">
+          <input type="text" id="copilot-input" class="copilot-input-field" placeholder="Ask about BTC, AAPL, EURUSD, Twitter sentiment..." autocomplete="off" />
+          <button type="submit" id="btn-copilot-send" class="copilot-send-btn">➔</button>
+        </form>
+      </div>
+    </div>
+
     <script src="dashboard.js"></script>
   </body>
 </html>

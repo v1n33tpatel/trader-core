@@ -13,8 +13,21 @@ try:
 except ImportError:
     BinanceBroker = None
 
+from quant_trading.admin_api import admin_blueprint
+from quant_trading.agent_c_api import agent_c_blueprint
+from quant_trading.orchestrator_api import orchestrator_blueprint
+from quant_trading.ctrader_api import ctrader_blueprint
+from quant_trading.workflow_api import workflow_blueprint
+from quant_trading.pubsub_api import pubsub_blueprint
+
 app = Flask(__name__)
 app.register_blueprint(research_blueprint)
+app.register_blueprint(admin_blueprint)
+app.register_blueprint(agent_c_blueprint)
+app.register_blueprint(orchestrator_blueprint)
+app.register_blueprint(ctrader_blueprint)
+app.register_blueprint(workflow_blueprint)
+app.register_blueprint(pubsub_blueprint)
 OLLAMA_URL = os.getenv("OLLAMA_HOST", "http://10.10.10.15:11434")
 
 ETORO_PAIRS = {
@@ -662,4 +675,5 @@ def agent_query():
         return jsonify({"error": str(e)}), 502
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

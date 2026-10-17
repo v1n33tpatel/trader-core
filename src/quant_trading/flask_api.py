@@ -93,10 +93,25 @@ def _etoro_status() -> dict[str, str]:
     )
 
 
+def _ctrader_status() -> dict[str, str]:
+    paths = [
+        PROJECT_ROOT / ".env",
+        PROJECT_ROOT / "ctrader.env",
+        PROJECT_ROOT / "config" / "ctrader.env",
+    ]
+    values = _read_env_values(paths)
+    client_id = values.get("CTRADER_CLIENT_ID", "")
+    token = values.get("CTRADER_ACCESS_TOKEN", "")
+    if not (client_id and token):
+        return {"status": "unconfigured", "detail": "cTrader credentials not provided"}
+    return {"status": "online", "detail": "cTrader configured"}
+
+
 def _api_statuses() -> dict[str, dict[str, str]]:
     checks = {
         "t212": _t212_status,
         "etoro": _etoro_status,
+        "ctrader": _ctrader_status,
         "yahoo": lambda: _probe_api("https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=1d&interval=1d", {"User-Agent": "MoneyMakingMachineResearch/1.0 (market-data; read-only)"}),
         "binance": lambda: _probe_api("https://api.binance.com/api/v3/ping"),
         "kraken": lambda: _probe_api("https://api.kraken.com/0/public/Time"),

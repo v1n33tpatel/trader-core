@@ -173,6 +173,51 @@ trader-core/
     * **Service Execution Target**:
       - Rootful or rootless Podman commands, `systemctl` service starts, and Quadlet activations belong strictly on `trader`.
 
+12. **Local Ollama Model Inventory & Role Assignments (`10.10.10.15:11434`)**:
+    * **Installed Model Catalog & Roles**:
+      - `llama3.1:8b`: Primary Fast Dispatcher, multi-broker tool caller, and reactive technical scanner.
+      - `deepseek-r1:14b`: Primary Institutional Quant Reasoner (chain-of-thought price action, liquidity sweeps, 1:2 R:R validation). Must be pulled on Ollama host via `ollama pull deepseek-r1:14b`.
+      - `deepseek-r1:7b`: Fallback Deep Reasoner if 14B is offline, loading, or unpulled.
+      - `nomic-embed-text:latest`: Vector embedding model for Open-WebUI Knowledge Base & RAG playbooks.
+      - `qwen2.5-coder:14b`: Advanced quantitative logic, formula derivation, and script synthesis.
+      - `llama3.2:3b` / `qwen3:4b-instruct`: Low-latency lightweight conversational fallbacks.
+    * **Model Fallback Invariant**:
+      - All backend routes querying Ollama (`/api/research/analyze`, `/api/orchestrator/synthesize`, `/api/agent/query`) must dynamically probe `/api/tags`.
+      - If the preferred Deep Reasoner (`deepseek-r1:14b`) is not installed or returns HTTP 404, the system must automatically fall back to `deepseek-r1:7b` without raising an unhandled 500/502 error to the user.
+
+13. **Systematic Day Trading Discipline & Execution Invariants**:
+    * **Mandatory Risk-to-Reward Constraint ($\text{R:R} \ge 2.0$)**:
+      - Every single trade setup proposed, backtested, or executed must demonstrate a mathematical Risk-to-Reward ratio of at least $1:2.0$:
+        $$\text{R:R} = \frac{|\text{TakeProfit} - \text{Entry}|}{|\text{Entry} - \text{StopLoss}|} \ge 2.0$$
+      - Sub-1:2 trades are strictly rejected by `RiskSentinel`.
+    * **Hard Day Trading Guardrails**:
+      - **Max Order Notional**: Maximum order allocation is capped at $\$50.00$ USD per trade.
+      - **Stop-Loss Cap**: Stop loss distance cannot exceed $2.0\%$ of entry price.
+      - **Daily Drawdown Circuit Breaker**: If realized intraday loss hits $3.0\%$, all trading halts for 24 hours.
+    * **Session Awareness & High-Liquidity Windows**:
+      - Focus intraday execution within high-volume session windows:
+        - London Open: `07:00 – 10:00 UTC`
+        - London / New York Overlap: `12:00 – 16:00 UTC`
+        - Asian Range Sweep: `00:00 – 04:00 UTC`
+      - Prohibit initiating new breakout entries during low-volume "dead zones" (21:00 – 23:00 UTC) or weekend crypto/forex gap-risk periods.
+    * **Flat End-of-Day (EOD) Protocol**:
+      - Day trading positions must be closed or transitioned to breakeven trailing stops before session close (21:00 UTC for equities/forex) to avoid overnight financing costs and gap risk.
+    * **No Market Chasing**:
+      - Entries must be anchored to structural price action: Fair Value Gap (FVG) retests, liquidity pool sweeps (EQH/EQL), or Value Area High/Low (VAH/VAL) rejections.
+
+14. **Social Sentiment & Macro Event Catalyst Invariants (Agent C Sentinel)**:
+    * **Tier-1 Macro Event Trading Embargo**:
+      - Automated entry execution must pause 30 minutes prior to and 15 minutes after Tier-1 economic releases (US Core CPI, FOMC Rate Decision & Press Conference, Non-Farm Payrolls / NFP, Core PCE) to protect capital from extreme binary spread widening and stop-hunt wicks.
+    * **Social Sentiment Divergence Invariant**:
+      - Track Twitter/X and Discord trader sentiment consensus against price structure:
+        - **Retail Bull Trap**: Heavy bullish chatter ($>75\%$ bull sentiment) into equal highs (EQH) resistance indicates institutional distribution / liquidity sweep; avoid buying breakouts.
+        - **Capitulation Long**: Extreme bearish sentiment ($>75\%$ bear chatter) accompanied by hammer rejection wicks into an unfilled FVG or CME gap indicates high-probability mean reversion accumulation.
+    * **On-Chain Whale Flow Signals**:
+      - Large exchange outflows ($>\$20\text{M}$) confirm institutional spot absorption (bullish supply sink).
+      - Large exchange inflows to spot/derivative wallets indicate imminent dumping or hedging pressure.
+    * **Multi-LLM Hierarchical Reasoning**:
+      - Fast triage via `llama3.1:8b`, deep chain-of-thought structural reasoning via `deepseek-r1:14b` (fallback `7b`), and market intelligence briefs synthesized by Agent C Sentinel.
+
 
 
 

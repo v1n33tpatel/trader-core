@@ -183,6 +183,12 @@ def configure_automation():
         store.set_setting("max_order_usd", str(float(payload["max_order_usd"])))
     if "stop_loss_pct" in payload:
         store.set_setting("stop_loss_pct", str(float(payload["stop_loss_pct"])))
+    if "max_daily_drawdown_pct" in payload:
+        store.set_setting("max_daily_drawdown_pct", str(float(payload["max_daily_drawdown_pct"])))
+    if "max_open_positions" in payload:
+        store.set_setting("max_open_positions", str(int(payload["max_open_positions"])))
+    if "min_risk_reward" in payload:
+        store.set_setting("min_risk_reward", str(float(payload["min_risk_reward"])))
 
     return jsonify({"status": "success", "message": "Automation settings saved"})
 
@@ -339,6 +345,10 @@ def get_admin_keys():
     kraken_sec = _val("KRAKEN_API_SECRET")
     xai_key = _val("XAI_API_KEY")
     discord_webhook = _val("DISCORD_WEBHOOK_URL")
+    ctrader_id = _val("CTRADER_CLIENT_ID")
+    ctrader_sec = _val("CTRADER_CLIENT_SECRET")
+    ctrader_acc = _val("CTRADER_ACCOUNT_ID")
+    ctrader_token = _val("CTRADER_ACCESS_TOKEN")
 
     return jsonify({
         "t212": {
@@ -360,6 +370,12 @@ def get_admin_keys():
             "configured": bool(kraken_key and kraken_sec),
             "key_preview": _mask_key(kraken_key),
             "has_secret": bool(kraken_sec),
+        },
+        "ctrader": {
+            "configured": bool(ctrader_id and ctrader_sec and ctrader_acc and ctrader_token),
+            "key_preview": _mask_key(ctrader_id),
+            "account_id": ctrader_acc if ctrader_acc else "",
+            "has_secret": bool(ctrader_sec and ctrader_token),
         },
         "xai": {
             "configured": bool(xai_key),
@@ -383,6 +399,8 @@ def update_admin_keys():
         "ETORO_API_KEY", "ETORO_USER_KEY",
         "BINANCE_API_KEY", "BINANCE_API_SECRET",
         "KRAKEN_API_KEY", "KRAKEN_API_SECRET",
+        "CTRADER_CLIENT_ID", "CTRADER_CLIENT_SECRET",
+        "CTRADER_ACCOUNT_ID", "CTRADER_ACCESS_TOKEN",
         "XAI_API_KEY", "DISCORD_WEBHOOK_URL", "X_BEARER_TOKEN"
     ]
 
@@ -398,6 +416,18 @@ def update_admin_keys():
         _update_env_file(PROJECT_ROOT / ".env", updates)
 
     return jsonify({"status": "success", "updated_keys": list(updates.keys())})
+
+
+@admin_blueprint.get("/api/admin/audit-ledger")
+def get_audit_ledger():
+    store = StateStore()
+    positions = store.get_positions(limit=50)
+    audits = store.get_daily_audits(limit=30)
+    return jsonify({
+        "positions": positions,
+        "audits": audits,
+        "count": len(positions)
+    })
 
 
 # =========================================================================
@@ -459,6 +489,36 @@ def get_local_agents():
             "endpoint": "engine.py / event loop",
             "role": "Scans ETH, BTC, SOL, AVAX every 60s for Price Action signals and evaluates against RiskSentinel.",
             "tools": ["BinanceFeed", "PriceActionStrategy", "RiskSentinel", "StateStore"]
+        },
+        {
+            "id": "event_bus",
+            "name": "Redis Pub/Sub Event Mesh",
+            "model": "Redis / In-Memory",
+            "type": "Decoupled Event Bus",
+            "status": "online",
+            "endpoint": "core/event_bus.py",
+            "role": "Decoupled message broker routing market feeds, signals, and order events across microservices.",
+            "tools": ["trader:events:market", "trader:events:signals", "trader:events:orders", "trader:events:telemetry"]
+        },
+        {
+            "id": "strategy_scanner",
+            "name": "Strategy Scanner Microservice",
+            "model": "Multi-Asset Scanner",
+            "type": "Signal Generator",
+            "status": "online",
+            "endpoint": "services/strategy_scanner.py",
+            "role": "Scans feeds, detects structural Price Action / FVG setups, and emits SignalEvents over Redis.",
+            "tools": ["evaluate_symbol", "publish_signal", "subsecond_l2_feed"]
+        },
+        {
+            "id": "order_execution_engine",
+            "name": "Order Execution Microservice",
+            "model": "Risk-Aware Execution",
+            "type": "Order Router & RiskSentinel",
+            "status": "armed",
+            "endpoint": "services/order_execution_engine.py",
+            "role": "Subscribes to SignalEvents, applies RiskSentinel constraints, and routes verified orders to brokers.",
+            "tools": ["risk_sentinel_validator", "broker_dispatch", "statestore_audit"]
         },
         {
             "id": "risk_sentinel",

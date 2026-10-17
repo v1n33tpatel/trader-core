@@ -3,6 +3,7 @@ const brokerNames = {
   etoro: "eToro Quant Hub",
   binance: "Binance Spot",
   kraken: "Kraken Spot",
+  ctrader: "cTrader (Forex)",
   quantai: "QuantAI",
   admin: "Admin & Control",
   intel: "Market Intel (Agent C)",
@@ -29,6 +30,7 @@ const brokerSearchPaths = {
   etoro: "/api/search/binance",
   binance: "/api/search/binance",
   kraken: "/api/search/kraken",
+  ctrader: "/api/search/ctrader",
 };
 const backtestForm = document.querySelector("#backtest-form");
 const priceFile = document.querySelector("#price-file");
@@ -54,6 +56,7 @@ const apiStatusNames = {
   dashboard: "Dashboard API",
   t212: "Trading 212 API",
   etoro: "eToro API",
+  ctrader: "cTrader API",
   yahoo: "Yahoo Finance API",
   binance: "Binance API",
   kraken: "Kraken API",
@@ -122,6 +125,7 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
       if (adminPanel) {
         adminPanel.hidden = false;
         loadAdminData();
+        if (typeof loadAuditLedger === "function") loadAuditLedger();
       }
       return;
     }
@@ -149,6 +153,7 @@ document.querySelectorAll(".broker-tab").forEach((tab) => {
     document.querySelector("#search-button").innerHTML = `Search ${broker.split(" ")[0]} <span aria-hidden="true">→</span>`;
     document.querySelector("#agent-title").textContent = `${broker} Research Agent`;
     searchResults.hidden = true;
+    if (typeof renderWorkflowChips === "function") renderWorkflowChips(currentBroker);
     loadPortfolio(currentBroker);
   });
 });
@@ -171,6 +176,7 @@ async function loadPortfolio(broker) {
     etoro: "/api/etoro/portfolio",
     binance: "/api/binance/portfolio",
     kraken: "/api/kraken/portfolio",
+    ctrader: "/api/ctrader/portfolio",
   };
   refreshButton.disabled = false;
   refreshButton.classList.add("is-loading");
@@ -525,6 +531,7 @@ marketForm.addEventListener("submit", async (event) => {
 });
 
 let binanceWebSocket = null;
+let binanceL2WebSocket = null;
 
 function disconnectBinanceWebSocket() {
   if (binanceWebSocket) {
@@ -534,6 +541,14 @@ function disconnectBinanceWebSocket() {
       binanceWebSocket.close();
     } catch (_) {}
     binanceWebSocket = null;
+  }
+  if (binanceL2WebSocket) {
+    try {
+      binanceL2WebSocket.onclose = null;
+      binanceL2WebSocket.onerror = null;
+      binanceL2WebSocket.close();
+    } catch (_) {}
+    binanceL2WebSocket = null;
   }
   const badge = document.querySelector("#live-ws-badge");
   if (badge) badge.hidden = true;
@@ -547,13 +562,14 @@ function connectBinanceWebSocket(symbol, interval) {
   const rawSym = symbol.toUpperCase();
   const pair = rawSym.endsWith("USDT") ? rawSym.toLowerCase() : `${rawSym.toLowerCase()}usdt`;
   const klineInterval = interval || "1h";
-  const wsUrl = `wss://stream.binance.com:9443/ws/${pair}@kline_${klineInterval}`;
+  const wsKlineUrl = `wss://stream.binance.com:9443/ws/${pair}@kline_${klineInterval}`;
+  const wsL2Url = `wss://stream.binance.com:9443/ws/${pair}@depth10@100ms`;
 
   try {
-    binanceWebSocket = new WebSocket(wsUrl);
+    binanceWebSocket = new WebSocket(wsKlineUrl);
     binanceWebSocket.onopen = () => {
       badge.hidden = false;
-      badge.title = `Live WebSocket stream active: ${pair}@kline_${klineInterval}`;
+      badge.title = `Live WebSocket stream active: ${pair}@kline_${klineInterval} + sub-second L2 @depth10@100ms`;
     };
     binanceWebSocket.onmessage = (event) => {
       try {
@@ -590,6 +606,33 @@ function connectBinanceWebSocket(symbol, interval) {
     };
     binanceWebSocket.onclose = () => {
       badge.hidden = true;
+    };
+
+    // Sub-Second Level 2 Orderbook Stream (@depth10@100ms)
+    binanceL2WebSocket = new WebSocket(wsL2Url);
+    binanceL2WebSocket.onmessage = (event) => {
+      try {
+        const l2 = JSON.parse(event.data);
+        const bids = l2.bids || [];
+        const asks = l2.asks || [];
+        if (bids.length && asks.length) {
+          const sumBids = bids.reduce((acc, b) => acc + parseFloat(b[1]), 0);
+          const sumAsks = asks.reduce((acc, a) => acc + parseFloat(a[1]), 0);
+          const total = sumBids + sumAsks;
+          const obi = total > 0 ? (sumBids - sumAsks) / total : 0;
+          const bestBid = parseFloat(bids[0][0]);
+          const bestAsk = parseFloat(asks[0][0]);
+          const spreadBps = bestBid > 0 ? ((bestAsk - bestBid) / bestBid) * 10000 : 0;
+
+          const liqCluster = document.querySelector("#liq-cluster");
+          if (liqCluster) {
+            const bias = obi > 0.15 ? "BID ABSORPTION" : obi < -0.15 ? "ASK DUMPING" : "BALANCED";
+            liqCluster.textContent = `L2 OBI: ${(obi * 100).toFixed(0)}% [${bias}]`;
+            liqCluster.className = obi > 0.15 ? "color-green" : obi < -0.15 ? "color-red" : "color-cyan";
+            liqCluster.title = `Top 10 Bids: ${sumBids.toFixed(2)} | Asks: ${sumAsks.toFixed(2)} | Spread: ${spreadBps.toFixed(1)} bps`;
+          }
+        }
+      } catch (_) {}
     };
   } catch (e) {
     console.error("Binance WS stream connection error", e);
@@ -1258,6 +1301,16 @@ async function loadAdminData() {
       if (elK) elK.textContent = data.kraken.key_preview ? `Current: ${data.kraken.key_preview}` : "Current: Not configured";
       if (elS) elS.textContent = data.kraken.has_secret ? "Current: •••••••• (Configured)" : "Current: Not configured";
     }
+    if (data.ctrader) {
+      const elId = document.querySelector("#hint-ctrader-id");
+      const elS = document.querySelector("#hint-ctrader-sec");
+      const elAcc = document.querySelector("#hint-ctrader-acc");
+      const elTok = document.querySelector("#hint-ctrader-tok");
+      if (elId) elId.textContent = data.ctrader.key_preview ? `Current: ${data.ctrader.key_preview}` : "Current: Not configured";
+      if (elS) elS.textContent = data.ctrader.has_secret ? "Current: •••••••• (Configured)" : "Current: Not configured";
+      if (elAcc) elAcc.textContent = data.ctrader.account_id ? `Current: ${data.ctrader.account_id}` : "Current: Not configured";
+      if (elTok) elTok.textContent = data.ctrader.has_secret ? "Current: •••••••• (Configured)" : "Current: Not configured";
+    }
   } catch (err) {
     console.warn("Failed to load admin keys:", err);
   }
@@ -1361,6 +1414,10 @@ function initAdminWorkspace() {
         BINANCE_API_SECRET: document.querySelector("#sec-binance-val")?.value || "",
         KRAKEN_API_KEY: document.querySelector("#key-kraken-val")?.value || "",
         KRAKEN_API_SECRET: document.querySelector("#sec-kraken-val")?.value || "",
+        CTRADER_CLIENT_ID: document.querySelector("#key-ctrader-id")?.value || "",
+        CTRADER_CLIENT_SECRET: document.querySelector("#sec-ctrader-val")?.value || "",
+        CTRADER_ACCOUNT_ID: document.querySelector("#acc-ctrader-val")?.value || "",
+        CTRADER_ACCESS_TOKEN: document.querySelector("#tok-ctrader-val")?.value || "",
       };
 
       try {
@@ -2006,3 +2063,551 @@ function initOrchestratorAdmin() {
     });
   }
 }
+
+
+/* =========================================================================
+   4. 8-STEP INTERACTIVE TRADE WORKFLOW PIPELINE CONTROLLER
+   ========================================================================= */
+
+const wfWatchlistsByBroker = {
+  binance: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"],
+  t212: ["AAPL", "NVDA", "MSFT", "TSLA", "SPY", "QQQ", "VOO"],
+  etoro: ["ETH", "BTC", "SOL", "NVDA", "SPX500", "NAS100"],
+  kraken: ["BTCUSD", "ETHUSD", "SOLUSD", "DOTUSD", "ADAUSD"],
+  ctrader: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "XAUUSD", "USOIL"],
+  quantai: ["BTCUSDT", "SPY", "EURUSD", "ETHUSDT", "NVDA"],
+};
+
+let wfCurrentStep = 1;
+let wfCurrentSymbol = "ETHUSDT";
+let wfCurrentData = null;
+
+function renderWorkflowChips(broker, assetFilter = "ALL") {
+  const container = document.querySelector("#wf-instrument-chips");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const list = wfWatchlistsByBroker[broker] || wfWatchlistsByBroker.binance;
+  list.forEach((sym) => {
+    // Quick asset class categorization
+    let assetClass = "CRYPTO";
+    if (sym.includes("USD") && (sym.includes("EUR") || sym.includes("GBP") || sym.includes("JPY") || sym.includes("AUD") || sym.includes("CAD"))) {
+      assetClass = "FOREX";
+    } else if (sym === "XAUUSD" || sym === "USOIL") {
+      assetClass = "COMMODITY";
+    } else if (sym === "SPY" || sym === "QQQ" || sym === "VOO") {
+      assetClass = "ETFS";
+    } else if (["AAPL", "NVDA", "MSFT", "TSLA"].includes(sym)) {
+      assetClass = "STOCKS";
+    }
+
+    if (assetFilter === "ALL" || assetFilter === assetClass || (assetFilter === "FOREX" && assetClass === "COMMODITY")) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `wf-chip ${sym === wfCurrentSymbol ? "is-active" : ""}`;
+      btn.textContent = sym;
+      btn.addEventListener("click", () => {
+        container.querySelectorAll(".wf-chip").forEach((c) => c.classList.remove("is-active"));
+        btn.classList.add("is-active");
+        wfCurrentSymbol = sym;
+        const input = document.querySelector("#wf-symbol-input");
+        if (input) input.value = sym;
+      });
+      container.appendChild(btn);
+    }
+  });
+}
+
+function goToWorkflowStep(stepNum) {
+  wfCurrentStep = stepNum;
+  const nodes = document.querySelectorAll(".wf-step-node");
+  nodes.forEach((node) => {
+    const s = Number(node.dataset.step);
+    node.classList.toggle("is-active", s === stepNum);
+    node.classList.toggle("is-completed", s < stepNum);
+  });
+
+  for (let i = 1; i <= 8; i++) {
+    const panel = document.querySelector(`#wf-panel-${i}`);
+    if (panel) panel.hidden = (i !== stepNum);
+  }
+
+  const badge = document.querySelector("#wf-current-badge");
+  if (badge) badge.textContent = `STEP ${stepNum} OF 8`;
+}
+
+async function loadWorkflowRecommendation(symbol) {
+  wfCurrentSymbol = symbol.toUpperCase().trim();
+  goToWorkflowStep(2);
+
+  const headline = document.querySelector("#wf-news-headline");
+  if (headline) headline.textContent = `Analyzing ${wfCurrentSymbol} across social feeds, orderbook, and structure...`;
+
+  try {
+    const res = await fetch("/api/workflow/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: wfCurrentSymbol, broker: currentBroker }),
+    });
+    const data = await res.json();
+    if (data.status !== "success") throw new Error(data.error || "Recommendation failed");
+    wfCurrentData = data;
+
+    // Step 2: Research
+    const scoreEl = document.querySelector("#wf-sentiment-score");
+    const badgeEl = document.querySelector("#wf-sentiment-badge");
+    const velEl = document.querySelector("#wf-mention-velocity");
+    const newsEl = document.querySelector("#wf-news-headline");
+    const newsSentEl = document.querySelector("#wf-news-sentiment");
+    const macroRiskEl = document.querySelector("#wf-macro-risk");
+    const macroDotEl = document.querySelector("#wf-macro-dot");
+
+    if (scoreEl) scoreEl.textContent = (data.step_2_research.sentiment_score > 0 ? "+" : "") + data.step_2_research.sentiment_score.toFixed(2);
+    if (badgeEl) {
+      badgeEl.textContent = data.step_2_research.sentiment_label;
+      badgeEl.className = data.step_2_research.sentiment_label === "BULLISH" ? "badge badge-strat" : "badge";
+    }
+    if (velEl) velEl.textContent = `${data.step_2_research.mention_velocity} mentions / hr · Institutional sentiment`;
+    if (newsEl) newsEl.textContent = data.step_2_research.headline;
+    if (newsSentEl) newsSentEl.textContent = `AI Sentiment: ${data.step_2_research.sentiment_label} ACCUMULATION`;
+    if (macroRiskEl) {
+      macroRiskEl.textContent = data.step_2_research.macro_risk_warning ? "HIGH RISK EVENT SOON" : "TIER-1 CLEAR (SAFE)";
+      macroRiskEl.style.color = data.step_2_research.macro_risk_warning ? "#ef4444" : "#10b981";
+    }
+    if (macroDotEl) {
+      macroDotEl.className = data.step_2_research.macro_risk_warning ? "status-dot status-dot-offline" : "status-dot status-dot-online";
+    }
+
+    // Step 3: Suggest
+    const setupName = document.querySelector("#wf-setup-name");
+    const setupBias = document.querySelector("#wf-setup-bias");
+    const setupConf = document.querySelector("#wf-setup-confidence");
+    if (setupName) setupName.textContent = data.step_3_suggest.setup_name;
+    if (setupBias) {
+      setupBias.textContent = `BIAS: ${data.step_3_suggest.action}`;
+      setupBias.style.color = data.step_3_suggest.action === "BUY" ? "#10b981" : "#ef4444";
+    }
+    if (setupConf) setupConf.textContent = `CONFIDENCE: ${(data.step_3_suggest.confidence * 100).toFixed(0)}%`;
+
+    // Step 4: Analyze
+    const pHigh = document.querySelector("#wf-pivot-high");
+    const pLow = document.querySelector("#wf-pivot-low");
+    const poc = document.querySelector("#wf-poc");
+    const va = document.querySelector("#wf-va");
+    const fvg = document.querySelector("#wf-fvg");
+    if (pHigh) pHigh.textContent = `$${data.step_4_analyze.pivot_high.toFixed(2)}`;
+    if (pLow) pLow.textContent = `$${data.step_4_analyze.pivot_low.toFixed(2)}`;
+    if (poc) poc.textContent = `$${data.step_4_analyze.point_of_control.toFixed(2)}`;
+    if (va) va.textContent = `$${data.step_4_analyze.value_area_low.toFixed(2)} - $${data.step_4_analyze.value_area_high.toFixed(2)}`;
+    if (fvg) fvg.textContent = `Retest $${data.step_4_analyze.fvg_zone[0].toFixed(2)} - $${data.step_4_analyze.fvg_zone[1].toFixed(2)}`;
+
+    // Step 5: Strategy
+    const stratTitle = document.querySelector("#wf-strat-title");
+    if (stratTitle) stratTitle.textContent = `${data.step_5_strategy.strategy_name} (${data.step_5_strategy.category.toUpperCase()})`;
+
+    // Step 6: Parameters
+    const pEntry = document.querySelector("#wf-param-entry");
+    const pStop = document.querySelector("#wf-param-stop");
+    const pRiskPct = document.querySelector("#wf-param-risk-pct");
+    const pTp = document.querySelector("#wf-param-tp");
+    const pRr = document.querySelector("#wf-param-rr");
+    const pSize = document.querySelector("#wf-param-size");
+    const pUnits = document.querySelector("#wf-param-units");
+
+    if (pEntry) pEntry.textContent = `$${data.step_6_parameters.entry_price.toFixed(data.step_6_parameters.entry_price < 10 ? 4 : 2)}`;
+    if (pStop) pStop.textContent = `$${data.step_6_parameters.stop_loss.toFixed(data.step_6_parameters.stop_loss < 10 ? 4 : 2)}`;
+    if (pRiskPct) pRiskPct.textContent = `-${data.step_6_parameters.risk_pct}% Risk (Under Rejection Wick)`;
+    if (pTp) pTp.textContent = `$${data.step_6_parameters.take_profit.toFixed(data.step_6_parameters.take_profit < 10 ? 4 : 2)}`;
+    if (pRr) pRr.textContent = `Target R:R 1:${data.step_6_parameters.risk_reward_ratio} (≥ 1:2.0 Mandatory)`;
+    if (pSize) pSize.textContent = `$${data.step_6_parameters.recommended_size_usd.toFixed(2)}`;
+    if (pUnits) pUnits.textContent = `Units: ${data.step_6_parameters.recommended_units} · RiskSentinel Cap`;
+
+  } catch (err) {
+    if (headline) headline.textContent = `Error loading workflow intel: ${err.message}`;
+  }
+}
+
+function initWorkflowController() {
+  renderWorkflowChips(currentBroker);
+
+  // Stepper Node Click
+  document.querySelectorAll(".wf-step-node").forEach((node) => {
+    node.addEventListener("click", () => {
+      const step = Number(node.dataset.step);
+      goToWorkflowStep(step);
+    });
+  });
+
+  // Asset Filter Pills
+  document.querySelectorAll(".wf-filter-pill").forEach((pill) => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll(".wf-filter-pill").forEach((p) => p.classList.remove("is-active"));
+      pill.classList.add("is-active");
+      renderWorkflowChips(currentBroker, pill.dataset.asset);
+    });
+  });
+
+  // Reset Workflow
+  const btnReset = document.querySelector("#btn-wf-reset");
+  if (btnReset) {
+    btnReset.addEventListener("click", () => {
+      goToWorkflowStep(1);
+    });
+  }
+
+  // Step 1: Next / Research
+  const btnStep1Next = document.querySelector("#btn-wf-step1-next");
+  if (btnStep1Next) {
+    btnStep1Next.addEventListener("click", () => {
+      const input = document.querySelector("#wf-symbol-input");
+      const sym = input?.value.trim() || wfCurrentSymbol || "ETHUSDT";
+      loadWorkflowRecommendation(sym);
+    });
+  }
+
+  // Stepper Back/Next buttons
+  for (let i = 1; i <= 7; i++) {
+    const btnBack = document.querySelector(`#btn-wf-back-${i}`);
+    if (btnBack) btnBack.addEventListener("click", () => goToWorkflowStep(i));
+
+    const btnNext = document.querySelector(`#btn-wf-step${i}-next`);
+    if (btnNext) btnNext.addEventListener("click", () => goToWorkflowStep(i + 1));
+  }
+
+  // Step 4: Load on Candlestick Chart
+  const btnChartLoad = document.querySelector("#btn-wf-chart-load");
+  if (btnChartLoad) {
+    btnChartLoad.addEventListener("click", () => {
+      const symInput = document.querySelector("#market-symbol");
+      const provSelect = document.querySelector("#market-provider");
+      if (symInput && wfCurrentSymbol) {
+        symInput.value = wfCurrentSymbol;
+        if (provSelect) {
+          provSelect.value = ["BTCUSDT", "ETHUSDT", "SOLUSDT"].some((k) => wfCurrentSymbol.includes(k)) ? "binance" : "yahoo";
+        }
+        document.querySelector("#load-market-data")?.click();
+        document.querySelector("#market-chart-frame")?.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  }
+
+  // Step 5: Apply Strategy
+  const btnApplyStrat = document.querySelector("#btn-wf-apply-strat");
+  if (btnApplyStrat) {
+    btnApplyStrat.addEventListener("click", async () => {
+      const stratId = wfCurrentData?.step_5_strategy?.strategy_id || "price_action";
+      try {
+        await fetch("/api/strategies/select", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ strategy_id: stratId }),
+        });
+        const select = document.querySelector("#auto-strategy-select");
+        if (select) select.value = stratId;
+        btnApplyStrat.textContent = "✓ Strategy Selected & Applied";
+        btnApplyStrat.disabled = true;
+      } catch (_) {}
+    });
+  }
+
+  // Step 7: Demo Order Execution
+  const btnDemoExec = document.querySelector("#btn-wf-demo-execute");
+  const wfDemoMsg = document.querySelector("#wf-demo-msg");
+  if (btnDemoExec) {
+    btnDemoExec.addEventListener("click", async () => {
+      if (wfDemoMsg) wfDemoMsg.textContent = "Submitting simulated demo order...";
+      const params = wfCurrentData?.step_6_parameters || {};
+      const payload = {
+        symbol: wfCurrentSymbol,
+        broker: currentBroker,
+        side: wfCurrentData?.step_3_suggest?.action || "BUY",
+        units: params.recommended_units || 1.0,
+        price: params.entry_price || 100.0,
+      };
+
+      try {
+        const res = await fetch("/api/workflow/demo-execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const d = await res.json();
+        if (wfDemoMsg) {
+          wfDemoMsg.textContent = `✓ Demo Order Executed (${d.order_id}): ${payload.side} ${payload.symbol}`;
+          wfDemoMsg.className = "status-msg color-green";
+        }
+        loadPortfolio(currentBroker);
+      } catch (err) {
+        if (wfDemoMsg) wfDemoMsg.textContent = `Failed: ${err.message}`;
+      }
+    });
+  }
+
+  // Step 8: Live Realtime Execution
+  const btnLiveExec = document.querySelector("#btn-wf-live-execute");
+  const wfLiveMsg = document.querySelector("#wf-live-msg");
+  if (btnLiveExec) {
+    btnLiveExec.addEventListener("click", () => {
+      // Trigger confirmation modal
+      const modal = document.querySelector("#real-mode-modal");
+      if (modal) {
+        modal.hidden = false;
+        const confirmBtn = document.querySelector("#btn-modal-confirm");
+        if (confirmBtn) {
+          confirmBtn.onclick = () => {
+            modal.hidden = true;
+            if (wfLiveMsg) {
+              wfLiveMsg.textContent = `🚀 Live Order Armed for ${wfCurrentSymbol} on ${currentBroker.toUpperCase()}`;
+              wfLiveMsg.className = "status-msg color-green";
+            }
+          };
+        }
+      }
+    });
+  }
+}
+
+
+/* =========================================================================
+   5. FLOATING AI QUANT COPILOT CHATBOT CONTROLLER
+   ========================================================================= */
+
+function initQuantCopilot() {
+  const toggleBtn = document.querySelector("#btn-copilot-toggle");
+  const copilotWin = document.querySelector("#copilot-window");
+  const closeBtn = document.querySelector("#btn-copilot-close");
+  const clearBtn = document.querySelector("#btn-copilot-clear");
+  const modelSelect = document.querySelector("#copilot-active-model");
+  const modelPill = document.querySelector("#copilot-model-pill");
+  const form = document.querySelector("#copilot-form");
+  const input = document.querySelector("#copilot-input");
+  const messagesBox = document.querySelector("#copilot-messages");
+
+  if (!toggleBtn || !copilotWin) return;
+
+  toggleBtn.addEventListener("click", () => {
+    copilotWin.hidden = !copilotWin.hidden;
+    if (!copilotWin.hidden && input) input.focus();
+  });
+
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      copilotWin.hidden = true;
+    });
+  }
+
+  if (clearBtn && messagesBox) {
+    clearBtn.addEventListener("click", () => {
+      messagesBox.innerHTML = `
+        <div class="copilot-msg msg-assistant">
+          <div class="msg-bubble">
+            <strong>Chat history cleared.</strong> How can I assist your quantitative analysis today?
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  if (modelSelect && modelPill) {
+    modelSelect.addEventListener("change", () => {
+      modelPill.textContent = modelSelect.value;
+    });
+  }
+
+  // Quick Chips
+  document.querySelectorAll(".copilot-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      if (input) {
+        input.value = chip.dataset.query;
+        form?.dispatchEvent(new Event("submit"));
+      }
+    });
+  });
+
+  function appendCopilotMessage(sender, text, isActionable = false) {
+    if (!messagesBox) return;
+    const msgDiv = document.createElement("div");
+    msgDiv.className = `copilot-msg msg-${sender}`;
+
+    const bubble = document.createElement("div");
+    bubble.className = "msg-bubble";
+    bubble.innerHTML = text.replace(/\n/g, "<br/>");
+
+    if (isActionable) {
+      // Extract possible ticker symbols (e.g. BTC, ETH, SOL, NVDA, AAPL, EURUSD)
+      const words = text.match(/\b(BTC|ETH|SOL|NVDA|AAPL|MSFT|SPY|QQQ|EURUSD|GBPUSD|XAUUSD)\b/g);
+      if (words && words.length) {
+        const uniqueSym = [...new Set(words)][0];
+        const actionBtn = document.createElement("button");
+        actionBtn.type = "button";
+        actionBtn.className = "chat-action-btn";
+        actionBtn.textContent = `⚡ Step Into 8-Step Workflow (${uniqueSym})`;
+        actionBtn.addEventListener("click", () => {
+          loadWorkflowRecommendation(uniqueSym);
+          document.querySelector("#trade-workflow-card")?.scrollIntoView({ behavior: "smooth" });
+        });
+        bubble.appendChild(document.createElement("br"));
+        bubble.appendChild(actionBtn);
+      }
+    }
+
+    msgDiv.appendChild(bubble);
+    messagesBox.appendChild(msgDiv);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }
+
+  if (form && input) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendCopilotMessage("user", text);
+      input.value = "";
+
+      // Typing placeholder
+      const typingDiv = document.createElement("div");
+      typingDiv.className = "copilot-msg msg-assistant typing-indicator";
+      typingDiv.innerHTML = '<div class="msg-bubble"><em>Quant Copilot is reasoning...</em></div>';
+      messagesBox?.appendChild(typingDiv);
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+
+      const selectedModel = modelSelect?.value || "llama3.1:8b";
+      try {
+        const res = await fetch("/api/orchestrator/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            command: text,
+            model: selectedModel,
+            broker: currentBroker,
+          }),
+        });
+        typingDiv.remove();
+
+        const data = await res.json();
+        if (data.status === "success" && data.response) {
+          appendCopilotMessage("assistant", data.response, true);
+        } else {
+          // Dynamic fallback to local Ollama if 404
+          const fbRes = await fetch("/api/agent/query?broker=" + currentBroker + "&symbol=ETH");
+          const fbData = await fbRes.json();
+          appendCopilotMessage("assistant", fbData.analysis || data.error || "Analysis completed.", true);
+        }
+      } catch (err) {
+        typingDiv.remove();
+        appendCopilotMessage("assistant", `Copilot request failed: ${err.message}`);
+      }
+    });
+  }
+}
+
+
+/* =========================================================================
+   6. ADMIN SENTINEL BOUNDS & AUDIT LEDGER CONTROLLER
+   ========================================================================= */
+
+async function loadAuditLedger() {
+  const tbody = document.querySelector("#audit-ledger-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">Loading StateStore trade ledger...</td></tr>';
+
+  try {
+    const res = await fetch("/api/admin/audit-ledger");
+    const data = await res.json();
+    const positions = Array.isArray(data.positions) ? data.positions : [];
+    if (!positions.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">No trades recorded yet. Run a demo order in Step 7 to see live ledger rows.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = "";
+    positions.forEach((p) => {
+      const tr = document.createElement("tr");
+      const sideClass = p.side === "BUY" ? "color-green" : "color-red";
+      tr.innerHTML = `
+        <td><code>${p.position_id}</code></td>
+        <td><strong>${p.symbol}</strong></td>
+        <td><span class="badge">${(p.broker || "BINANCE").toUpperCase()}</span></td>
+        <td class="${sideClass}"><strong>${p.side}</strong></td>
+        <td>${p.units}</td>
+        <td>$${Number(p.entry_price || 0).toFixed(4)}</td>
+        <td><small>${p.opened_at ? new Date(p.opened_at).toLocaleTimeString() : "Recent"}</small></td>
+        <td><span class="badge badge-strat">RECORDED</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-cell">Ledger error: ${err.message}</td></tr>`;
+  }
+}
+
+function initAdminControls() {
+  // Load Bounds on init
+  const loadBounds = async () => {
+    try {
+      const res = await fetch("/api/automation/status");
+      const data = await res.json();
+      if (data.guardrails) {
+        const g = data.guardrails;
+        const elMax = document.querySelector("#bounds-max-order");
+        const elSl = document.querySelector("#bounds-stop-loss");
+        const elCb = document.querySelector("#bounds-circuit-breaker");
+        const elPos = document.querySelector("#bounds-max-positions");
+        const elRr = document.querySelector("#bounds-min-rr");
+
+        if (elMax && g.max_order_usd) elMax.value = g.max_order_usd;
+        if (elSl && g.stop_loss_pct) elSl.value = g.stop_loss_pct;
+        if (elCb && g.max_daily_drawdown_pct) elCb.value = g.max_daily_drawdown_pct;
+        if (elPos && g.max_open_positions) elPos.value = g.max_open_positions;
+        if (elRr && g.min_risk_reward) elRr.value = g.min_risk_reward;
+      }
+    } catch (_) {}
+  };
+  loadBounds();
+
+  // Save Bounds Form
+  const formBounds = document.querySelector("#form-risksentinel-bounds");
+  const boundsStatus = document.querySelector("#bounds-save-status");
+  if (formBounds) {
+    formBounds.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (boundsStatus) boundsStatus.textContent = "Saving RiskSentinel bounds...";
+
+      const payload = {
+        max_order_usd: parseFloat(document.querySelector("#bounds-max-order")?.value || 50),
+        stop_loss_pct: parseFloat(document.querySelector("#bounds-stop-loss")?.value || 2.0),
+        max_daily_drawdown_pct: parseFloat(document.querySelector("#bounds-circuit-breaker")?.value || 3.0),
+        max_open_positions: parseInt(document.querySelector("#bounds-max-positions")?.value || 5, 10),
+        min_risk_reward: parseFloat(document.querySelector("#bounds-min-rr")?.value || 2.0),
+      };
+
+      try {
+        const res = await fetch("/api/automation/configure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (boundsStatus) {
+          boundsStatus.textContent = "✓ RiskSentinel bounds saved and armed.";
+          boundsStatus.className = "status-msg color-green";
+        }
+        refreshAutomationStatus();
+      } catch (err) {
+        if (boundsStatus) boundsStatus.textContent = `Error: ${err.message}`;
+      }
+    });
+  }
+
+  // Refresh Ledger Button
+  const btnRefreshLedger = document.querySelector("#btn-refresh-ledger");
+  if (btnRefreshLedger) {
+    btnRefreshLedger.addEventListener("click", loadAuditLedger);
+  }
+}
+
+// Global initialization of new workflow & copilot modules
+initWorkflowController();
+initQuantCopilot();
+initAdminControls();
